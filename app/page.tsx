@@ -92,7 +92,7 @@ export default function Home() {
               href="https://www.helloasso.com" // 👈 Remplace par le lien direct de ta campagne HelloAsso
               target="_blank"
               rel="noopener noreferrer"
-              className="bg-[#F26D5B] text-white px-5 py-2.5 rounded-full hover:bg-[#1B2A4A] transition-colors shadow-sm font-bold flex items-center gap-2"
+              className="bg-[#1B2A4A] text-white px-5 py-2.5 rounded-full hover:bg-[#F26D5B] transition-colors shadow-sm font-bold flex items-center gap-2"
             >
               <span>🎟️</span> Adhérer
             </a>
