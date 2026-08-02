@@ -251,6 +251,30 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+
+        {/* SECTION PROJETS / OPÉRATIONS SPÉCIALES */}
+        <div className="mt-10 pt-8 border-t border-[#1B2A4A]/10">
+          <h2 className="text-xl font-black mb-4 flex items-center gap-2">🚀 Projets & Opérations</h2>
+          
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <a
+              href="/admin/roses"
+              className="bg-white border border-[#1B2A4A]/10 p-5 rounded-2xl shadow-sm hover:shadow-md transition group flex items-center justify-between"
+            >
+              <div className="space-y-1">
+                <span className="text-2xl">🌹</span>
+                <h3 className="font-bold text-sm text-[#1B2A4A] group-hover:text-[#F26D5B] transition-colors">
+                  Vente de Roses (St-Valentin)
+                </h3>
+                <p className="text-xs text-[#1B2A4A]/60">
+                  Consulter les commandes, paiements et livraisons
+                </p>
+              </div>
+              <span className="text-[#1B2A4A]/40 group-hover:translate-x-1 transition-transform font-bold">→</span>
+            </a>
+          </div>
+        </div>
+
       </div>
     </div>
   )
