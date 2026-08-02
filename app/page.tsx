@@ -426,11 +426,13 @@ export default function Home() {
         )}
       </section>
 
-      {/* Footer */}
+      {/* Footer / Contact */}
       <footer id="contact" className="bg-[#1B2A4A] text-white rounded-t-[2.5rem] md:rounded-t-[3rem] mx-3 md:mx-5">
         <div className="max-w-6xl mx-auto px-6 md:px-10 py-14 grid md:grid-cols-2 gap-10 items-center">
-          <div>
-            <div className="flex items-center gap-3 mb-4">
+          
+          {/* Colonne Gauche : Infos & Liens */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-3">
               <img
                 src="/logo-mdle.png"
                 alt="Logo MDLE Jean Perrin"
@@ -440,20 +442,69 @@ export default function Home() {
                 MDLE <span className="text-[#F26D5B]">Jean Perrin</span>
               </span>
             </div>
-            <p className="text-white/45 text-sm max-w-sm leading-relaxed mb-6">
-              L'association des lycéens, pour les lycéens. Foyer des élèves, Lycée Polyvalent Jean Perrin, Marseille.
+
+            <p className="text-white/60 text-sm max-w-sm leading-relaxed">
+              L'association des lycéens et des étudiants. MDLE, Lycée Polyvalent Jean Perrin, Marseille.
             </p>
+
+            <div className="space-y-3 pt-2 text-sm">
+              {/* Email */}
+              <a
+                href="mailto:mdle.jeanperrin.marseille@gmail.com"
+                className="flex items-center gap-3 p-3.5 bg-white/5 hover:bg-white/10 transition-colors rounded-2xl border border-white/10 group"
+              >
+                <span className="text-xl">✉️</span>
+                <div>
+                  <p className="font-bold text-white text-xs">Adresse Mail</p>
+                  <p className="text-[#F26D5B] font-semibold text-xs group-hover:underline">
+                    mdle.jeanperrin.marseille@gmail.com
+                  </p>
+                </div>
+              </a>
+
+              {/* Instagram */}
+              <a
+                href="https://www.instagram.com/mdle.perrin"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3.5 bg-white/5 hover:bg-white/10 transition-colors rounded-2xl border border-white/10 group"
+              >
+                <span className="text-xl">📸</span>
+                <div>
+                  <p className="font-bold text-white text-xs">Instagram</p>
+                  <p className="text-[#F26D5B] font-semibold text-xs group-hover:underline">
+                    @mdle.perrin
+                  </p>
+                </div>
+              </a>
+
+              {/* TikTok */}
+              <a
+                href="https://www.tiktok.com/@mdle.perrin"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3.5 bg-white/5 hover:bg-white/10 transition-colors rounded-2xl border border-white/10 group"
+              >
+                <span className="text-xl">🎵</span>
+                <div>
+                  <p className="font-bold text-white text-xs">TikTok</p>
+                  <p className="text-[#F26D5B] font-semibold text-xs group-hover:underline">
+                    @mdle.perrin
+                  </p>
+                </div>
+              </a>
+            </div>
           </div>
 
-          <div className="relative aspect-video rounded-2xl overflow-hidden border border-white/10">
-            <iframe
-              title="Carte du lycée Jean Perrin"
-              src="https://www.google.com/maps?q=Lyc%C3%A9e+Jean+Perrin+Marseille&output=embed"
-              className="w-full h-full grayscale-[30%] contrast-110"
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
+          {/* Colonne Droite : Image bâtiment */}
+          <div className="bg-[#FAFAF8] p-3 rounded-3xl border border-white/10 shadow-sm overflow-hidden flex items-center justify-center">
+            <img
+              src="/plan-acces.jpg"
+              alt="Bâtiment de la MDLE du Lycée Jean Perrin"
+              className="w-full h-auto max-h-[420px] object-contain rounded-2xl"
             />
           </div>
+
         </div>
       </footer>
 
