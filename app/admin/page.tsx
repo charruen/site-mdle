@@ -8,13 +8,11 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// Mot de passe d'administration (modifiable si besoin)
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'mdle2026'
-
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [passwordInput, setPasswordInput] = useState('')
   const [passwordError, setPasswordError] = useState(false)
+  const [loginLoading, setLoginLoading] = useState(false)
 
   // Gestion des tables
   const [menuItems, setMenuItems] = useState<any[]>([])
@@ -43,15 +41,30 @@ export default function AdminPage() {
     }
   }, [])
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (passwordInput === ADMIN_PASSWORD) {
-      setIsAuthenticated(true)
-      localStorage.setItem('mdle_admin_auth', 'true')
-      setPasswordError(false)
-      fetchData()
-    } else {
+    setPasswordError(false)
+    setLoginLoading(true)
+
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: passwordInput }),
+      })
+
+      if (res.ok) {
+        setIsAuthenticated(true)
+        localStorage.setItem('mdle_admin_auth', 'true')
+        setPasswordInput('')
+        fetchData()
+      } else {
+        setPasswordError(true)
+      }
+    } catch {
       setPasswordError(true)
+    } finally {
+      setLoginLoading(false)
     }
   }
 
@@ -142,9 +155,10 @@ export default function AdminPage() {
             </div>
             <button
               type="submit"
-              className="w-full bg-[#1B2A4A] hover:bg-[#F26D5B] text-white font-bold py-3 rounded-xl transition-colors text-sm shadow-md"
+              disabled={loginLoading}
+              className="w-full bg-[#1B2A4A] hover:bg-[#F26D5B] text-white font-bold py-3 rounded-xl transition-colors text-sm shadow-md disabled:opacity-50"
             >
-              Se connecter
+              {loginLoading ? 'Vérification...' : 'Se connecter'}
             </button>
           </form>
         </div>
