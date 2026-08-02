@@ -89,7 +89,7 @@ export default function Home() {
               </a>
             ))}
             <a
-              href="https://www.helloasso.com" // 👈 Remplace par le lien direct de ta campagne HelloAsso
+              href="https://www.sumup.com"
               target="_blank"
               rel="noopener noreferrer"
               className="bg-[#1B2A4A] text-white px-5 py-2.5 rounded-full hover:bg-[#F26D5B] transition-colors shadow-sm font-bold flex items-center gap-2"
@@ -141,7 +141,7 @@ export default function Home() {
               </a>
             ))}
             <a
-              href="https://www.helloasso.com" // 👈 Remplace aussi le lien ici pour le menu mobile
+              href="https://www.sumup.com" // 👈 Remplace aussi le lien ici pour le menu mobile
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setMenuOpen(false)}
@@ -416,7 +416,7 @@ export default function Home() {
                       rel="noopener noreferrer"
                       className="text-xs font-bold text-white bg-[#F26D5B] hover:bg-[#1B2A4A] px-4 py-2 rounded-full transition-colors shrink-0"
                     >
-                      Payer sur HelloAsso →
+                      Payer sur SumUp →
                     </a>
                   )}
                 </div>

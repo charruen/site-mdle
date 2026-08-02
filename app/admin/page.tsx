@@ -218,7 +218,7 @@ export default function AdminPage() {
                 <input type="text" placeholder="Lieu (ex: Foyer)" value={eventLocation} onChange={e => setEventLocation(e.target.value)} className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" />
               </div>
               <input type="text" placeholder="Description" value={eventDescription} onChange={e => setEventDescription(e.target.value)} className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" />
-              <input type="url" placeholder="Lien HelloAsso (optionnel)" value={eventPaymentLink} onChange={e => setEventPaymentLink(e.target.value)} className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" />
+              <input type="url" placeholder="Lien SumUp (optionnel)" value={eventPaymentLink} onChange={e => setEventPaymentLink(e.target.value)} className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" />
               <button type="submit" className="w-full bg-[#1B2A4A] text-white font-bold py-3 rounded-xl hover:bg-[#F26D5B] transition text-sm flex items-center justify-center gap-2">
                 <Plus className="w-4 h-4" /> Publier l'événement
               </button>
