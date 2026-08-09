@@ -403,7 +403,7 @@ export default function AdminPage() {
 
               <textarea
                 rows={3}
-                placeholder="Description de l'événement (multilignes acceptées)"
+                placeholder="Description de l'événement (optionnel)"
                 value={eventDescription}
                 onChange={e => setEventDescription(e.target.value)}
                 className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm resize-y whitespace-pre-line"
