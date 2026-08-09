@@ -93,7 +93,7 @@ export default function AdminPage() {
     setLoading(true)
     const { data: menuData } = await supabase.from('menu_items').select('*').order('id')
     const { data: eventData } = await supabase.from('events').select('*').order('id')
-    
+
     if (menuData) setMenuItems(menuData)
     if (eventData) setEvents(eventData)
 
@@ -352,7 +352,13 @@ export default function AdminPage() {
                 </select>
                 <input type="text" placeholder="Prix (ex: 1,50€)" value={newPrice} onChange={e => setNewPrice(e.target.value)} className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" required />
               </div>
-              <input type="text" placeholder="Description courte (optionnel)" value={newDescription} onChange={e => setNewDescription(e.target.value)} className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" />
+              <textarea
+                rows={2}
+                placeholder="Description courte (optionnel)"
+                value={newDescription}
+                onChange={e => setNewDescription(e.target.value)}
+                className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm resize-y whitespace-pre-line"
+              />
               <button type="submit" className="w-full bg-[#1B2A4A] text-white font-bold py-3 rounded-xl hover:bg-[#F26D5B] transition text-sm flex items-center justify-center gap-2">
                 <Plus className="w-4 h-4" /> Ajouter à la Carte
               </button>
@@ -363,7 +369,10 @@ export default function AdminPage() {
                 <div key={item.id} className="bg-white border border-[#1B2A4A]/10 p-4 rounded-xl flex items-center justify-between">
                   <div>
                     <p className="font-bold text-sm">{item.title} — <span className="text-[#F26D5B]">{item.price}</span></p>
-                    <span className="text-[10px] font-bold uppercase text-[#1B2A4A]/40">{item.category}</span>
+                    {item.description && (
+                      <p className="text-xs text-[#1B2A4A]/70 whitespace-pre-line mt-1">{item.description}</p>
+                    )}
+                    <span className="text-[10px] font-bold uppercase text-[#1B2A4A]/40 mt-1 block">{item.category}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <button onClick={() => toggleAvailability(item.id, item.is_available)} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${item.is_available ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
@@ -381,7 +390,7 @@ export default function AdminPage() {
             <h2 className="text-xl font-black flex items-center gap-2">📅 Gestion de l'Agenda</h2>
             <form onSubmit={handleAddEvent} className="bg-white border border-[#1B2A4A]/10 rounded-2xl p-6 shadow-sm space-y-3">
               <input type="text" placeholder="Titre de l'événement" value={eventTitle} onChange={e => setEventTitle(e.target.value)} className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" required />
-              
+
               <div className="grid grid-cols-2 gap-3">
                 <input type="text" placeholder="Date (ex: 25 Sept)" value={eventDate} onChange={e => setEventDate(e.target.value)} className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" required />
                 <input type="text" placeholder="Prix (ex: 5,00€ ou Gratuit)" value={eventPrice} onChange={e => setEventPrice(e.target.value)} className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" />
@@ -392,7 +401,13 @@ export default function AdminPage() {
                 <input type="url" placeholder="Lien SumUp / Réservation (optionnel)" value={eventPaymentLink} onChange={e => setEventPaymentLink(e.target.value)} className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" />
               </div>
 
-              <input type="text" placeholder="Description" value={eventDescription} onChange={e => setEventDescription(e.target.value)} className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" />
+              <textarea
+                rows={3}
+                placeholder="Description de l'événement (multilignes acceptées)"
+                value={eventDescription}
+                onChange={e => setEventDescription(e.target.value)}
+                className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm resize-y whitespace-pre-line"
+              />
 
               <button type="submit" className="w-full bg-[#1B2A4A] text-white font-bold py-3 rounded-xl hover:bg-[#F26D5B] transition text-sm flex items-center justify-center gap-2">
                 <Plus className="w-4 h-4" /> Publier l'événement
@@ -408,6 +423,11 @@ export default function AdminPage() {
                       {event.price && <span className="ml-2 font-bold text-[#F26D5B]">({event.price})</span>}
                     </p>
                     <p className="text-xs text-[#1B2A4A]/60">{event.date} • {event.location || 'Lieu non spécifié'}</p>
+                    {event.description && (
+                      <p className="text-xs text-[#1B2A4A]/80 whitespace-pre-line mt-2 bg-[#FAFAF8] p-2 rounded-lg border border-[#1B2A4A]/5">
+                        {event.description}
+                      </p>
+                    )}
                   </div>
                   <button onClick={() => handleDeleteEvent(event.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                 </div>
@@ -439,7 +459,7 @@ export default function AdminPage() {
           )}
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            
+
             {projects.length === 0 && (
               <div className="col-span-full bg-white border border-[#1B2A4A]/10 p-8 rounded-2xl text-center space-y-2">
                 <p className="text-sm font-bold text-[#1B2A4A]">Aucun projet créé pour l'instant.</p>
@@ -455,9 +475,8 @@ export default function AdminPage() {
                     <span className="text-3xl">{proj.emoji || '🚀'}</span>
                     <button
                       onClick={() => toggleProjectActive(proj.id, proj.is_active)}
-                      className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full transition ${
-                        proj.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'
-                      }`}
+                      className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full transition ${proj.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'
+                        }`}
                     >
                       {proj.is_active ? 'Actif' : 'Masqué'}
                     </button>
@@ -518,263 +537,262 @@ export default function AdminPage() {
       {showCreateModal && (
         <div className="fixed inset-0 z-50 bg-[#1B2A4A]/60 backdrop-blur-sm overflow-y-auto">
           <div className="min-h-full flex items-start justify-center p-4 py-8">
-          <div className="bg-white border border-[#1B2A4A]/10 rounded-3xl p-6 md:p-8 max-w-3xl w-full shadow-2xl space-y-6">
-            <div className="flex justify-between items-center border-b border-[#1B2A4A]/10 pb-4">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-[#F26D5B]" />
-                <h2 className="text-xl font-black text-[#1B2A4A]">Nouveau Projet / Opération</h2>
+            <div className="bg-white border border-[#1B2A4A]/10 rounded-3xl p-6 md:p-8 max-w-3xl w-full shadow-2xl space-y-6">
+              <div className="flex justify-between items-center border-b border-[#1B2A4A]/10 pb-4">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-[#F26D5B]" />
+                  <h2 className="text-xl font-black text-[#1B2A4A]">Nouveau Projet / Opération</h2>
+                </div>
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="p-2 text-[#1B2A4A]/60 hover:text-[#1B2A4A] hover:bg-gray-100 rounded-full"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="p-2 text-[#1B2A4A]/60 hover:text-[#1B2A4A] hover:bg-gray-100 rounded-full"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            <form onSubmit={handleCreateProject} className="space-y-6">
-              
-              {/* 1. Choix du modèle */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#1B2A4A]/70">
-                  1. Sélectionner un modèle de départ (Template)
-                </label>
-                <div className="grid sm:grid-cols-2 gap-2">
-                  {PRESET_TEMPLATES.map(tmpl => (
-                    <button
-                      key={tmpl.id}
-                      type="button"
-                      onClick={() => handleTemplateSelect(tmpl.id)}
-                      className={`p-3 rounded-2xl text-left border transition text-xs flex items-start gap-3 ${
-                        selectedTemplateId === tmpl.id
+              <form onSubmit={handleCreateProject} className="space-y-6">
+
+                {/* 1. Choix du modèle */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[#1B2A4A]/70">
+                    1. Sélectionner un modèle de départ (Template)
+                  </label>
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    {PRESET_TEMPLATES.map(tmpl => (
+                      <button
+                        key={tmpl.id}
+                        type="button"
+                        onClick={() => handleTemplateSelect(tmpl.id)}
+                        className={`p-3 rounded-2xl text-left border transition text-xs flex items-start gap-3 ${selectedTemplateId === tmpl.id
                           ? 'border-[#F26D5B] bg-[#F26D5B]/5 ring-2 ring-[#F26D5B]/20'
                           : 'border-[#1B2A4A]/10 hover:border-[#1B2A4A]/30'
-                      }`}
+                          }`}
+                      >
+                        <span className="text-xl">{tmpl.emoji}</span>
+                        <div>
+                          <p className="font-bold text-[#1B2A4A]">{tmpl.name}</p>
+                          <p className="text-[10px] text-[#1B2A4A]/60 mt-0.5">{tmpl.description}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2. Infos générales */}
+                <div className="space-y-3 pt-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[#1B2A4A]/70">
+                    2. Informations Générales
+                  </label>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-2">
+                      <input
+                        type="text"
+                        placeholder="Titre du projet (ex: Bal de Fin d'Année)"
+                        value={projectTitle}
+                        onChange={e => handleTitleChange(e.target.value)}
+                        className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm font-semibold"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Emoji (ex: 🎟️)"
+                        value={projectEmoji}
+                        onChange={e => setProjectEmoji(e.target.value)}
+                        className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm font-semibold text-center"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-[#1B2A4A]/50 mb-1">Identifiant URL (Slug)</label>
+                      <input
+                        type="text"
+                        placeholder="ex: bal-fin-annee"
+                        value={projectSlug}
+                        onChange={e => setProjectSlug(e.target.value)}
+                        className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-xs font-mono"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-[#1B2A4A]/50 mb-1">Tag / Badge</label>
+                      <input
+                        type="text"
+                        placeholder="ex: Inscription Bal"
+                        value={projectBadgeTag}
+                        onChange={e => setProjectBadgeTag(e.target.value)}
+                        className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-xs font-semibold"
+                      />
+                    </div>
+                  </div>
+
+                  <textarea
+                    placeholder="Description du projet (ex: Réservez votre entrée pour le bal...)"
+                    value={projectDescription}
+                    onChange={e => setProjectDescription(e.target.value)}
+                    className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm h-20"
+                  />
+                </div>
+
+                {/* 3. Éditeur Dynamique de Variantes / Tarifs / Types de Paiement */}
+                <div className="space-y-3 pt-2 bg-[#FAFAF8] p-4 rounded-2xl border border-[#1B2A4A]/10">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#1B2A4A] flex items-center gap-1.5">
+                      <DollarSign className="w-4 h-4 text-[#F26D5B]" /> Tarifs, Types d'Entrée & Options de Paiement
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAddOptionGroup}
+                      className="text-[11px] font-bold text-white bg-[#1B2A4A] hover:bg-[#F26D5B] px-3 py-1.5 rounded-lg transition"
                     >
-                      <span className="text-xl">{tmpl.emoji}</span>
-                      <div>
-                        <p className="font-bold text-[#1B2A4A]">{tmpl.name}</p>
-                        <p className="text-[10px] text-[#1B2A4A]/60 mt-0.5">{tmpl.description}</p>
-                      </div>
+                      + Ajouter un groupe d'options
                     </button>
-                  ))}
+                  </div>
+
+                  {(!customFormConfig.options || customFormConfig.options.length === 0) ? (
+                    <p className="text-xs text-[#1B2A4A]/50 italic">Aucun choix de tarif défini. Cliquez ci-dessus pour ajouter vos prix/entrées.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {customFormConfig.options.map((optGroup, optIdx) => (
+                        <div key={optGroup.id || optIdx} className="bg-white border border-[#1B2A4A]/10 p-3.5 rounded-xl space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <input
+                              type="text"
+                              value={optGroup.label}
+                              onChange={e => {
+                                const newOpts = [...(customFormConfig.options || [])]
+                                newOpts[optIdx].label = e.target.value
+                                setCustomFormConfig({ ...customFormConfig, options: newOpts })
+                              }}
+                              className="text-xs font-bold bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-lg p-2 flex-1"
+                              placeholder="Nom du groupe (ex: Type d'entrée, Couleur...)"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveOptionGroup(optIdx)}
+                              className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
+                              title="Supprimer ce groupe"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          {/* Liste des choix et tarifs */}
+                          <div className="space-y-2 pl-2">
+                            <p className="text-[10px] font-bold text-[#1B2A4A]/50 uppercase">Choix & Prix unitaires :</p>
+                            {optGroup.choices.map((choice, choiceIdx) => (
+                              <div key={choiceIdx} className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={choice.name}
+                                  onChange={e => handleUpdateChoice(optIdx, choiceIdx, 'name', e.target.value)}
+                                  placeholder="Nom de l'option (ex: Entrée Classique (5,00€))"
+                                  className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-lg p-2 text-xs font-semibold flex-1"
+                                />
+                                <div className="w-28 flex items-center gap-1 bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-lg px-2 py-1.5">
+                                  <span className="text-xs text-[#1B2A4A]/60">€</span>
+                                  <input
+                                    type="number"
+                                    step="0.50"
+                                    value={choice.price}
+                                    onChange={e => handleUpdateChoice(optIdx, choiceIdx, 'price', e.target.value)}
+                                    className="w-full bg-transparent text-xs font-bold text-right focus:outline-none"
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveChoice(optIdx, choiceIdx)}
+                                  className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => handleAddChoice(optIdx)}
+                              className="text-[10px] font-bold text-[#F26D5B] hover:underline mt-1 inline-block"
+                            >
+                              + Ajouter une option de paiement / choix
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
 
-              {/* 2. Infos générales */}
-              <div className="space-y-3 pt-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#1B2A4A]/70">
-                  2. Informations Générales
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="col-span-2">
-                    <input
-                      type="text"
-                      placeholder="Titre du projet (ex: Bal de Fin d'Année)"
-                      value={projectTitle}
-                      onChange={e => handleTitleChange(e.target.value)}
-                      className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm font-semibold"
-                      required
-                    />
+                {/* 4. Réglages des cases à cocher du Formulaire */}
+                <div className="space-y-3 pt-2 bg-[#FAFAF8] p-4 rounded-2xl border border-[#1B2A4A]/10">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#1B2A4A] flex items-center gap-1.5">
+                      <Settings2 className="w-4 h-4 text-[#F26D5B]" /> Options additionnelles du Formulaire
+                    </span>
                   </div>
-                  <div>
-                    <input
-                      type="text"
-                      placeholder="Emoji (ex: 🎟️)"
-                      value={projectEmoji}
-                      onChange={e => setProjectEmoji(e.target.value)}
-                      className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm font-semibold text-center"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-bold text-[#1B2A4A]/50 mb-1">Identifiant URL (Slug)</label>
-                    <input
-                      type="text"
-                      placeholder="ex: bal-fin-annee"
-                      value={projectSlug}
-                      onChange={e => setProjectSlug(e.target.value)}
-                      className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-xs font-mono"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-[#1B2A4A]/50 mb-1">Tag / Badge</label>
-                    <input
-                      type="text"
-                      placeholder="ex: Inscription Bal"
-                      value={projectBadgeTag}
-                      onChange={e => setProjectBadgeTag(e.target.value)}
-                      className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-xs font-semibold"
-                    />
+                  <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
+                    <label className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-[#1B2A4A]/5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!customFormConfig.has_receiver}
+                        onChange={e => setCustomFormConfig({ ...customFormConfig, has_receiver: e.target.checked })}
+                        className="accent-[#F26D5B]"
+                      />
+                      <span>Demander le destinataire</span>
+                    </label>
+                    <label className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-[#1B2A4A]/5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!customFormConfig.allow_quantity}
+                        onChange={e => setCustomFormConfig({ ...customFormConfig, allow_quantity: e.target.checked })}
+                        className="accent-[#F26D5B]"
+                      />
+                      <span>Sélecteur de quantité</span>
+                    </label>
+                    <label className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-[#1B2A4A]/5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!customFormConfig.allow_anonymous}
+                        onChange={e => setCustomFormConfig({ ...customFormConfig, allow_anonymous: e.target.checked })}
+                        className="accent-[#F26D5B]"
+                      />
+                      <span>Option Envoi Anonyme</span>
+                    </label>
+                    <label className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-[#1B2A4A]/5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!customFormConfig.allow_message}
+                        onChange={e => setCustomFormConfig({ ...customFormConfig, allow_message: e.target.checked })}
+                        className="accent-[#F26D5B]"
+                      />
+                      <span>Option Mot Doux (+0.50€)</span>
+                    </label>
                   </div>
                 </div>
 
-                <textarea
-                  placeholder="Description du projet (ex: Réservez votre entrée pour le bal...)"
-                  value={projectDescription}
-                  onChange={e => setProjectDescription(e.target.value)}
-                  className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm h-20"
-                />
-              </div>
-
-              {/* 3. Éditeur Dynamique de Variantes / Tarifs / Types de Paiement */}
-              <div className="space-y-3 pt-2 bg-[#FAFAF8] p-4 rounded-2xl border border-[#1B2A4A]/10">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-[#1B2A4A] flex items-center gap-1.5">
-                    <DollarSign className="w-4 h-4 text-[#F26D5B]" /> Tarifs, Types d'Entrée & Options de Paiement
-                  </span>
+                {/* Bouton de confirmation */}
+                <div className="pt-3 flex justify-end gap-3 border-t border-[#1B2A4A]/10">
                   <button
                     type="button"
-                    onClick={handleAddOptionGroup}
-                    className="text-[11px] font-bold text-white bg-[#1B2A4A] hover:bg-[#F26D5B] px-3 py-1.5 rounded-lg transition"
+                    onClick={() => setShowCreateModal(false)}
+                    className="px-5 py-3 rounded-xl border border-[#1B2A4A]/10 text-xs font-bold hover:bg-gray-50"
                   >
-                    + Ajouter un groupe d'options
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creatingProject}
+                    className="bg-[#1B2A4A] hover:bg-[#F26D5B] text-white font-bold px-6 py-3 rounded-xl text-xs transition shadow-md disabled:opacity-50"
+                  >
+                    {creatingProject ? 'Création...' : 'Créer et Publier le Projet 🚀'}
                   </button>
                 </div>
 
-                {(!customFormConfig.options || customFormConfig.options.length === 0) ? (
-                  <p className="text-xs text-[#1B2A4A]/50 italic">Aucun choix de tarif défini. Cliquez ci-dessus pour ajouter vos prix/entrées.</p>
-                ) : (
-                  <div className="space-y-4">
-                    {customFormConfig.options.map((optGroup, optIdx) => (
-                      <div key={optGroup.id || optIdx} className="bg-white border border-[#1B2A4A]/10 p-3.5 rounded-xl space-y-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <input
-                            type="text"
-                            value={optGroup.label}
-                            onChange={e => {
-                              const newOpts = [...(customFormConfig.options || [])]
-                              newOpts[optIdx].label = e.target.value
-                              setCustomFormConfig({ ...customFormConfig, options: newOpts })
-                            }}
-                            className="text-xs font-bold bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-lg p-2 flex-1"
-                            placeholder="Nom du groupe (ex: Type d'entrée, Couleur...)"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveOptionGroup(optIdx)}
-                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
-                            title="Supprimer ce groupe"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        {/* Liste des choix et tarifs */}
-                        <div className="space-y-2 pl-2">
-                          <p className="text-[10px] font-bold text-[#1B2A4A]/50 uppercase">Choix & Prix unitaires :</p>
-                          {optGroup.choices.map((choice, choiceIdx) => (
-                            <div key={choiceIdx} className="flex items-center gap-2">
-                              <input
-                                type="text"
-                                value={choice.name}
-                                onChange={e => handleUpdateChoice(optIdx, choiceIdx, 'name', e.target.value)}
-                                placeholder="Nom de l'option (ex: Entrée Classique (5,00€))"
-                                className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-lg p-2 text-xs font-semibold flex-1"
-                              />
-                              <div className="w-28 flex items-center gap-1 bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-lg px-2 py-1.5">
-                                <span className="text-xs text-[#1B2A4A]/60">€</span>
-                                <input
-                                  type="number"
-                                  step="0.50"
-                                  value={choice.price}
-                                  onChange={e => handleUpdateChoice(optIdx, choiceIdx, 'price', e.target.value)}
-                                  className="w-full bg-transparent text-xs font-bold text-right focus:outline-none"
-                                />
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveChoice(optIdx, choiceIdx)}
-                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ))}
-                          <button
-                            type="button"
-                            onClick={() => handleAddChoice(optIdx)}
-                            className="text-[10px] font-bold text-[#F26D5B] hover:underline mt-1 inline-block"
-                          >
-                            + Ajouter une option de paiement / choix
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* 4. Réglages des cases à cocher du Formulaire */}
-              <div className="space-y-3 pt-2 bg-[#FAFAF8] p-4 rounded-2xl border border-[#1B2A4A]/10">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-[#1B2A4A] flex items-center gap-1.5">
-                    <Settings2 className="w-4 h-4 text-[#F26D5B]" /> Options additionnelles du Formulaire
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
-                  <label className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-[#1B2A4A]/5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={!!customFormConfig.has_receiver}
-                      onChange={e => setCustomFormConfig({ ...customFormConfig, has_receiver: e.target.checked })}
-                      className="accent-[#F26D5B]"
-                    />
-                    <span>Demander le destinataire</span>
-                  </label>
-                  <label className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-[#1B2A4A]/5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={!!customFormConfig.allow_quantity}
-                      onChange={e => setCustomFormConfig({ ...customFormConfig, allow_quantity: e.target.checked })}
-                      className="accent-[#F26D5B]"
-                    />
-                    <span>Sélecteur de quantité</span>
-                  </label>
-                  <label className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-[#1B2A4A]/5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={!!customFormConfig.allow_anonymous}
-                      onChange={e => setCustomFormConfig({ ...customFormConfig, allow_anonymous: e.target.checked })}
-                      className="accent-[#F26D5B]"
-                    />
-                    <span>Option Envoi Anonyme</span>
-                  </label>
-                  <label className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-[#1B2A4A]/5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={!!customFormConfig.allow_message}
-                      onChange={e => setCustomFormConfig({ ...customFormConfig, allow_message: e.target.checked })}
-                      className="accent-[#F26D5B]"
-                    />
-                    <span>Option Mot Doux (+0.50€)</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Bouton de confirmation */}
-              <div className="pt-3 flex justify-end gap-3 border-t border-[#1B2A4A]/10">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-5 py-3 rounded-xl border border-[#1B2A4A]/10 text-xs font-bold hover:bg-gray-50"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={creatingProject}
-                  className="bg-[#1B2A4A] hover:bg-[#F26D5B] text-white font-bold px-6 py-3 rounded-xl text-xs transition shadow-md disabled:opacity-50"
-                >
-                  {creatingProject ? 'Création...' : 'Créer et Publier le Projet 🚀'}
-                </button>
-              </div>
-
-            </form>
-          </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
