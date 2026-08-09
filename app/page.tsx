@@ -417,7 +417,7 @@ export default function Home() {
               Planning & Projets
             </span>
             <h2 className="text-3xl md:text-5xl font-black tracking-tight mt-1">
-              Futurs Événements
+              Dates Importantes
             </h2>
           </div>
         </div>
@@ -485,10 +485,10 @@ export default function Home() {
             Opérations & Réservations
           </span>
           <h2 className="text-3xl md:text-5xl font-black tracking-tight mt-1">
-            Projets & Ventes en Cours
+            Événements en Cours / à Venir
           </h2>
           <p className="text-[#1B2A4A]/60 text-sm mt-2">
-            Participe aux opérations de la MDLE et effectue tes réservations directement en ligne.
+            Participe aux événements de la MDLE et effectue tes réservations directement en ligne.
           </p>
         </div>
 
