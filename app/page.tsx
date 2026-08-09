@@ -63,32 +63,13 @@ export default function Home() {
           .eq("is_active", true)
           .order("id", { ascending: false });
 
-        if (projData && projData.length > 0) {
+        if (projData) {
           setActiveProjects(projData);
         } else {
-          // Fallback avec l'opération Roses par défaut
-          setActiveProjects([
-            {
-              id: 1,
-              slug: "roses",
-              title: "Vente de Roses (St-Valentin)",
-              emoji: "🌹",
-              badge_tag: "Opération Saint-Valentin",
-              description: "Réservation de roses avec envoi de mots doux et livraison en classe."
-            }
-          ]);
+          setActiveProjects([]);
         }
       } catch {
-        setActiveProjects([
-          {
-            id: 1,
-            slug: "roses",
-            title: "Vente de Roses (St-Valentin)",
-            emoji: "🌹",
-            badge_tag: "Opération Saint-Valentin",
-            description: "Réservation de roses avec envoi de mots doux et livraison en classe."
-          }
-        ]);
+        setActiveProjects([]);
       }
 
       if (menuData) setMenuItems(menuData);

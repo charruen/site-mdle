@@ -376,36 +376,10 @@ export default function AdminPage() {
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             
-            {/* Carte de secours pour les Roses si la table projects n'est pas encore remplie */}
             {projects.length === 0 && (
-              <div className="bg-white border border-[#1B2A4A]/10 p-5 rounded-2xl shadow-sm hover:shadow-md transition space-y-4">
-                <div className="flex justify-between items-start">
-                  <span className="text-3xl">🌹</span>
-                  <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
-                    Actif (Par défaut)
-                  </span>
-                </div>
-                <div>
-                  <h3 className="font-bold text-base text-[#1B2A4A]">Vente de Roses (St-Valentin)</h3>
-                  <p className="text-xs text-[#1B2A4A]/60 mt-1 line-clamp-2">
-                    Réservation de roses avec choix de couleur, mot doux et livraison.
-                  </p>
-                </div>
-                <div className="pt-2 border-t border-[#1B2A4A]/5 flex items-center justify-between">
-                  <a
-                    href="/admin/roses"
-                    className="text-xs font-bold text-[#F26D5B] hover:underline"
-                  >
-                    Gérer les commandes →
-                  </a>
-                  <button
-                    onClick={() => copyPublicLink('roses')}
-                    className="text-xs font-semibold text-[#1B2A4A]/60 flex items-center gap-1 hover:text-[#1B2A4A]"
-                  >
-                    {copiedSlug === 'roses' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                    {copiedSlug === 'roses' ? 'Copié !' : 'Lien'}
-                  </button>
-                </div>
+              <div className="col-span-full bg-white border border-[#1B2A4A]/10 p-8 rounded-2xl text-center space-y-2">
+                <p className="text-sm font-bold text-[#1B2A4A]">Aucun projet créé pour l'instant.</p>
+                <p className="text-xs text-[#1B2A4A]/60">Cliquez sur "Créer un nouveau Projet" ci-dessus pour lancer votre première opération.</p>
               </div>
             )}
 

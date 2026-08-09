@@ -35,37 +35,20 @@ export default function ProjectSubmissionsAdminPage() {
         .eq('id', projectId)
         .single()
 
-      let currentProject = projData
+      setProject(projData)
 
-      // Fallback si c'est l'ID des roses ou non trouve
-      if (!currentProject && (projectId === 'roses' || projectId === '1')) {
-        currentProject = {
-          id: 1,
-          slug: 'roses',
-          title: 'Vente de Roses (Saint-Valentin)',
-          description: 'Commandez une rose pour la Saint-Valentin !',
-          emoji: '🌹',
-          badge_tag: 'Opération Saint-Valentin',
-          is_active: true,
-          has_reservation_form: true,
-          form_config: { has_receiver: true }
-        }
-      }
-
-      setProject(currentProject)
-
-      if (currentProject) {
+      if (projData) {
         // 2. Récupération des soumissions depuis project_submissions
         const { data: subsData } = await supabase
           .from('project_submissions')
           .select('*')
-          .or(`project_id.eq.${currentProject.id},project_slug.eq.${currentProject.slug}`)
+          .or(`project_id.eq.${projData.id},project_slug.eq.${projData.slug}`)
           .order('id', { ascending: false })
 
         let list: ProjectSubmission[] = subsData || []
 
         // Rétrocompatibilité : Si c'est les roses, fusionner ou utiliser les données de rose_orders
-        if (currentProject.slug === 'roses') {
+        if (projData.slug === 'roses') {
           const { data: roseOrdersData } = await supabase
             .from('rose_orders')
             .select('*')
@@ -75,7 +58,7 @@ export default function ProjectSubmissionsAdminPage() {
             // Convertir rose_orders au format ProjectSubmission s'ils ne sont pas déjà dans list
             const legacyConverted: ProjectSubmission[] = roseOrdersData.map(r => ({
               id: r.id + 10000, // décalage d'ID visuel pour distinguer
-              project_id: currentProject.id,
+              project_id: projData.id,
               project_slug: 'roses',
               buyer_firstname: r.buyer_firstname,
               buyer_lastname: r.buyer_lastname,

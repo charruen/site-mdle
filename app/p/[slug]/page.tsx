@@ -10,41 +10,6 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// Configuration fallback pour la Vente de Roses si la table projects n'est pas encore migree
-const FALLBACK_ROSE_PROJECT: Project = {
-  id: 0,
-  slug: 'roses',
-  title: 'Vente de Roses (Saint-Valentin)',
-  description: 'Commandez une rose pour la Saint-Valentin ! Livraison directe dans les classes.',
-  emoji: '🌹',
-  badge_tag: 'Opération Saint-Valentin',
-  is_active: true,
-  has_reservation_form: true,
-  form_config: {
-    buyer_label: 'Vos informations (Restent confidentielles)',
-    has_receiver: true,
-    receiver_label: 'Pour qui est la rose ?',
-    options: [
-      {
-        id: 'color',
-        label: 'Couleur de la rose',
-        choices: [
-          { name: '🔴 Rouge (2,00€)', price: 2.00 },
-          { name: '🩷 Rose (2,00€)', price: 2.00 }
-        ]
-      }
-    ],
-    allow_quantity: true,
-    quantity_label: 'Nombre de rose(s)',
-    allow_anonymous: true,
-    anonymous_label: '🤫 Envoi Anonyme (votre nom ne sera pas donné au receveur)',
-    allow_message: true,
-    message_label: '💌 Ajouter un mot personnalisé (+0.50 €)',
-    message_price: 0.50,
-    confirmation_text: 'Merci ! Rend-toi au foyer MDLE pour effectuer le règlement et valider définitivement ta réservation.'
-  }
-}
-
 export default function DynamicProjectReservationPage() {
   const routeParams = useParams()
   const slug = (routeParams?.slug as string) || ''
@@ -87,20 +52,11 @@ export default function DynamicProjectReservationPage() {
         if (!error && data) {
           setProject(data)
           initDefaultOptions(data)
-        } else if (slug === 'roses' || slug === 'rose') {
-          // Fallback roses si non présent en BDD
-          setProject(FALLBACK_ROSE_PROJECT)
-          initDefaultOptions(FALLBACK_ROSE_PROJECT)
         } else {
           setNotFound(true)
         }
       } catch {
-        if (slug === 'roses' || slug === 'rose') {
-          setProject(FALLBACK_ROSE_PROJECT)
-          initDefaultOptions(FALLBACK_ROSE_PROJECT)
-        } else {
-          setNotFound(true)
-        }
+        setNotFound(true)
       } finally {
         setPageLoading(false)
       }
