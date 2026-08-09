@@ -516,8 +516,9 @@ export default function AdminPage() {
 
       {/* MODALE DE CRÉATION DE PROJET DYNAMIQUE */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-[#1B2A4A]/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border border-[#1B2A4A]/10 rounded-3xl p-6 md:p-8 max-w-3xl w-full shadow-2xl space-y-6 my-8">
+        <div className="fixed inset-0 z-50 bg-[#1B2A4A]/60 backdrop-blur-sm overflow-y-auto">
+          <div className="min-h-full flex items-start justify-center p-4 py-8">
+          <div className="bg-white border border-[#1B2A4A]/10 rounded-3xl p-6 md:p-8 max-w-3xl w-full shadow-2xl space-y-6">
             <div className="flex justify-between items-center border-b border-[#1B2A4A]/10 pb-4">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-[#F26D5B]" />
@@ -773,6 +774,7 @@ export default function AdminPage() {
               </div>
 
             </form>
+          </div>
           </div>
         </div>
       )}
