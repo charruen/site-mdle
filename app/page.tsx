@@ -355,8 +355,8 @@ export default function Home() {
                 type="button"
                 onClick={() => setSelectedCategory(cat)}
                 className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${selectedCategory === cat
-                    ? "bg-[#F2A63C] text-[#1B2A4A] shadow-md scale-105"
-                    : "bg-white/10 text-white/80 hover:bg-white/20 border border-white/10"
+                  ? "bg-[#F2A63C] text-[#1B2A4A] shadow-md scale-105"
+                  : "bg-white/10 text-white/80 hover:bg-white/20 border border-white/10"
                   }`}
               >
                 {cat}

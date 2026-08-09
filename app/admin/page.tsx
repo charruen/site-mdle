@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { Plus, Trash2, Lock, LogOut, ExternalLink, Copy, Check, Sparkles, X, Settings2, DollarSign } from 'lucide-react'
+import { Plus, Trash2, Lock, LogOut, ExternalLink, Copy, Check, Sparkles, X, Settings2, DollarSign, Pencil } from 'lucide-react'
 import { Project, PRESET_TEMPLATES, ProjectFormConfig } from '@/lib/projects'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -22,13 +22,15 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false)
   const [tableMissingWarning, setTableMissingWarning] = useState(false)
 
-  // Formulaire Produit
+  // Formulaire Produit / Édition
+  const [editingMenuItemId, setEditingMenuItemId] = useState<number | null>(null)
   const [newTitle, setNewTitle] = useState('')
   const [newCategory, setNewCategory] = useState('Boissons')
   const [newPrice, setNewPrice] = useState('')
   const [newDescription, setNewDescription] = useState('')
 
-  // Formulaire Événement
+  // Formulaire Événement / Édition
+  const [editingEventId, setEditingEventId] = useState<number | null>(null)
   const [eventTitle, setEventTitle] = useState('')
   const [eventDate, setEventDate] = useState('')
   const [eventLocation, setEventLocation] = useState('')
@@ -112,6 +114,7 @@ export default function AdminPage() {
     setLoading(false)
   }
 
+  // --- PRODUITS (CARTE) ---
   const handleAddMenuItem = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newTitle || !newPrice) return
@@ -119,9 +122,42 @@ export default function AdminPage() {
       { title: newTitle, category: newCategory, price: newPrice, description: newDescription, is_available: true }
     ])
     if (!error) {
-      setNewTitle('')
-      setNewPrice('')
-      setNewDescription('')
+      cancelEditMenuItem()
+      fetchData()
+    }
+  }
+
+  const startEditMenuItem = (item: any) => {
+    setEditingMenuItemId(item.id)
+    setNewTitle(item.title || '')
+    setNewCategory(item.category || 'Boissons')
+    setNewPrice(item.price || '')
+    setNewDescription(item.description || '')
+  }
+
+  const cancelEditMenuItem = () => {
+    setEditingMenuItemId(null)
+    setNewTitle('')
+    setNewCategory('Boissons')
+    setNewPrice('')
+    setNewDescription('')
+  }
+
+  const handleUpdateMenuItem = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingMenuItemId || !newTitle || !newPrice) return
+    const { error } = await supabase
+      .from('menu_items')
+      .update({
+        title: newTitle,
+        category: newCategory,
+        price: newPrice,
+        description: newDescription
+      })
+      .eq('id', editingMenuItemId)
+
+    if (!error) {
+      cancelEditMenuItem()
       fetchData()
     }
   }
@@ -136,6 +172,7 @@ export default function AdminPage() {
     fetchData()
   }
 
+  // --- ÉVÉNEMENTS (AGENDA) ---
   const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!eventTitle || !eventDate) return
@@ -150,12 +187,48 @@ export default function AdminPage() {
       }
     ])
     if (!error) {
-      setEventTitle('')
-      setEventDate('')
-      setEventLocation('')
-      setEventPrice('')
-      setEventDescription('')
-      setEventPaymentLink('')
+      cancelEditEvent()
+      fetchData()
+    }
+  }
+
+  const startEditEvent = (event: any) => {
+    setEditingEventId(event.id)
+    setEventTitle(event.title || '')
+    setEventDate(event.date || '')
+    setEventLocation(event.location || '')
+    setEventPrice(event.price || '')
+    setEventDescription(event.description || '')
+    setEventPaymentLink(event.payment_link || '')
+  }
+
+  const cancelEditEvent = () => {
+    setEditingEventId(null)
+    setEventTitle('')
+    setEventDate('')
+    setEventLocation('')
+    setEventPrice('')
+    setEventDescription('')
+    setEventPaymentLink('')
+  }
+
+  const handleUpdateEvent = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingEventId || !eventTitle || !eventDate) return
+    const { error } = await supabase
+      .from('events')
+      .update({
+        title: eventTitle,
+        date: eventDate,
+        location: eventLocation,
+        price: eventPrice,
+        description: eventDescription,
+        payment_link: eventPaymentLink
+      })
+      .eq('id', editingEventId)
+
+    if (!error) {
+      cancelEditEvent()
       fetchData()
     }
   }
@@ -172,7 +245,6 @@ export default function AdminPage() {
     if (tmpl) {
       setProjectEmoji(tmpl.emoji)
       setProjectBadgeTag(tmpl.badge_tag)
-      // Duplication profonde pour édition indépendante
       setCustomFormConfig(JSON.parse(JSON.stringify(tmpl.form_config)))
     }
   }
@@ -187,7 +259,6 @@ export default function AdminPage() {
     setProjectSlug(generatedSlug)
   }
 
-  // Helpers de gestion dynamique des options et tarifs
   const handleAddOptionGroup = () => {
     const newOpts = [...(customFormConfig.options || [])]
     newOpts.push({
@@ -257,7 +328,7 @@ export default function AdminPage() {
       setProjectDescription('')
       fetchData()
     } else {
-      alert("Erreur lors de la création du projet. Vérifiez que la table 'projects' existe dans Supabase (script schema.sql).")
+      alert("Erreur lors de la création du projet. Vérifiez que la table 'projects' existe dans Supabase.")
     }
     setCreatingProject(false)
   }
@@ -268,7 +339,7 @@ export default function AdminPage() {
   }
 
   const handleDeleteProject = async (id: number, title: string) => {
-    if (confirm(`Supprimer définitivement le projet "${title}" et toutes ses réservations ?`)) {
+    if (confirm(`Supprimer définitivement le projet « ${title} » et toutes ses réservations ?`)) {
       await supabase.from('projects').delete().eq('id', id)
       fetchData()
     }
@@ -342,8 +413,17 @@ export default function AdminPage() {
           {/* SECTION MENU */}
           <div className="space-y-6">
             <h2 className="text-xl font-black flex items-center gap-2">🍔 Gestion de la Carte</h2>
-            <form onSubmit={handleAddMenuItem} className="bg-white border border-[#1B2A4A]/10 rounded-2xl p-6 shadow-sm space-y-3">
+
+            <form onSubmit={editingMenuItemId ? handleUpdateMenuItem : handleAddMenuItem} className="bg-white border border-[#1B2A4A]/10 rounded-2xl p-6 shadow-sm space-y-3">
+              {editingMenuItemId && (
+                <div className="flex items-center justify-between bg-[#F26D5B]/10 p-3 rounded-xl border border-[#F26D5B]/20 text-xs text-[#F26D5B] font-bold">
+                  <span>✏️ Modification du produit en cours</span>
+                  <button type="button" onClick={cancelEditMenuItem} className="underline hover:text-[#1B2A4A]">Annuler</button>
+                </div>
+              )}
+
               <input type="text" placeholder="Nom de l'article" value={newTitle} onChange={e => setNewTitle(e.target.value)} className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" required />
+
               <div className="grid grid-cols-2 gap-3">
                 <select value={newCategory} onChange={e => setNewCategory(e.target.value)} className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm font-semibold">
                   <option value="Boissons">Boissons</option>
@@ -353,6 +433,7 @@ export default function AdminPage() {
                 </select>
                 <input type="text" placeholder="Prix (ex: 1,50€)" value={newPrice} onChange={e => setNewPrice(e.target.value)} className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" required />
               </div>
+
               <textarea
                 rows={2}
                 placeholder="Description courte (optionnel)"
@@ -360,14 +441,16 @@ export default function AdminPage() {
                 onChange={e => setNewDescription(e.target.value)}
                 className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm resize-y whitespace-pre-line"
               />
+
               <button type="submit" className="w-full bg-[#1B2A4A] text-white font-bold py-3 rounded-xl hover:bg-[#F26D5B] transition text-sm flex items-center justify-center gap-2">
-                <Plus className="w-4 h-4" /> Ajouter à la Carte
+                {editingMenuItemId ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                {editingMenuItemId ? "Enregistrer les modifications" : "Ajouter à la Carte"}
               </button>
             </form>
 
             <div className="space-y-2">
               {menuItems.map(item => (
-                <div key={item.id} className="bg-white border border-[#1B2A4A]/10 p-4 rounded-xl flex items-center justify-between">
+                <div key={item.id} className="bg-white border border-[#1B2A4A]/10 p-4 rounded-xl flex items-center justify-between gap-2">
                   <div>
                     <p className="font-bold text-sm">{item.title} — <span className="text-[#F26D5B]">{item.price}</span></p>
                     {item.description && (
@@ -375,11 +458,16 @@ export default function AdminPage() {
                     )}
                     <span className="text-[10px] font-bold uppercase text-[#1B2A4A]/40 mt-1 block">{item.category}</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button onClick={() => startEditMenuItem(item)} title="Modifier" className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition">
+                      <Pencil className="w-4 h-4" />
+                    </button>
                     <button onClick={() => toggleAvailability(item.id, item.is_available)} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${item.is_available ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                       {item.is_available ? 'Disponible' : 'Rupture'}
                     </button>
-                    <button onClick={() => handleDeleteMenuItem(item.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => handleDeleteMenuItem(item.id)} title="Supprimer" className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -389,7 +477,15 @@ export default function AdminPage() {
           {/* SECTION AGENDA */}
           <div className="space-y-6">
             <h2 className="text-xl font-black flex items-center gap-2">📅 Gestion de l'Agenda</h2>
-            <form onSubmit={handleAddEvent} className="bg-white border border-[#1B2A4A]/10 rounded-2xl p-6 shadow-sm space-y-3">
+
+            <form onSubmit={editingEventId ? handleUpdateEvent : handleAddEvent} className="bg-white border border-[#1B2A4A]/10 rounded-2xl p-6 shadow-sm space-y-3">
+              {editingEventId && (
+                <div className="flex items-center justify-between bg-[#F26D5B]/10 p-3 rounded-xl border border-[#F26D5B]/20 text-xs text-[#F26D5B] font-bold">
+                  <span>✏️ Modification de l'événement en cours</span>
+                  <button type="button" onClick={cancelEditEvent} className="underline hover:text-[#1B2A4A]">Annuler</button>
+                </div>
+              )}
+
               <input type="text" placeholder="Titre de l'événement" value={eventTitle} onChange={e => setEventTitle(e.target.value)} className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" required />
 
               <div className="grid grid-cols-2 gap-3">
@@ -411,13 +507,14 @@ export default function AdminPage() {
               />
 
               <button type="submit" className="w-full bg-[#1B2A4A] text-white font-bold py-3 rounded-xl hover:bg-[#F26D5B] transition text-sm flex items-center justify-center gap-2">
-                <Plus className="w-4 h-4" /> Publier l'événement
+                {editingEventId ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                {editingEventId ? "Enregistrer les modifications" : "Publier l'événement"}
               </button>
             </form>
 
             <div className="space-y-2">
               {events.map(event => (
-                <div key={event.id} className="bg-white border border-[#1B2A4A]/10 p-4 rounded-xl flex items-center justify-between">
+                <div key={event.id} className="bg-white border border-[#1B2A4A]/10 p-4 rounded-xl flex items-center justify-between gap-2">
                   <div>
                     <p className="font-bold text-sm">
                       {event.title}
@@ -430,7 +527,14 @@ export default function AdminPage() {
                       </p>
                     )}
                   </div>
-                  <button onClick={() => handleDeleteEvent(event.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button onClick={() => startEditEvent(event)} title="Modifier" className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition">
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => handleDeleteEvent(event.id)} title="Supprimer" className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -464,7 +568,7 @@ export default function AdminPage() {
             {projects.length === 0 && (
               <div className="col-span-full bg-white border border-[#1B2A4A]/10 p-8 rounded-2xl text-center space-y-2">
                 <p className="text-sm font-bold text-[#1B2A4A]">Aucun projet créé pour l'instant.</p>
-                <p className="text-xs text-[#1B2A4A]/60">Cliquez sur "Créer un nouveau Projet" ci-dessus pour lancer votre première opération.</p>
+                <p className="text-xs text-[#1B2A4A]/60">Cliquez sur « Créer un nouveau Projet » ci-dessus pour lancer votre première opération.</p>
               </div>
             )}
 
