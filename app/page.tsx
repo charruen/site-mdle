@@ -423,6 +423,11 @@ export default function Home() {
                 </div>
 
                 <div className="flex items-center gap-3 flex-wrap">
+                  {event.price && (
+                    <div className="text-xs font-bold text-[#F26D5B] bg-[#F26D5B]/10 px-3 py-1.5 rounded-full shrink-0">
+                      🎟️ {event.price}
+                    </div>
+                  )}
                   {event.location && (
                     <div className="text-xs font-bold text-[#1B2A4A]/60 bg-[#1B2A4A]/5 px-3 py-1.5 rounded-full shrink-0">
                       📍 {event.location}

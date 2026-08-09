@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS public.events (
     location TEXT,
     description TEXT,
     payment_link TEXT,
+    price TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

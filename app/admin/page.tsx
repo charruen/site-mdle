@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { Plus, Trash2, Lock, LogOut, ExternalLink, Copy, Check, Sparkles, X, Settings2 } from 'lucide-react'
+import { Plus, Trash2, Lock, LogOut, ExternalLink, Copy, Check, Sparkles, X, Settings2, DollarSign } from 'lucide-react'
 import { Project, PRESET_TEMPLATES, ProjectFormConfig } from '@/lib/projects'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -32,6 +32,7 @@ export default function AdminPage() {
   const [eventTitle, setEventTitle] = useState('')
   const [eventDate, setEventDate] = useState('')
   const [eventLocation, setEventLocation] = useState('')
+  const [eventPrice, setEventPrice] = useState('')
   const [eventDescription, setEventDescription] = useState('')
   const [eventPaymentLink, setEventPaymentLink] = useState('')
 
@@ -139,12 +140,20 @@ export default function AdminPage() {
     e.preventDefault()
     if (!eventTitle || !eventDate) return
     const { error } = await supabase.from('events').insert([
-      { title: eventTitle, date: eventDate, location: eventLocation, description: eventDescription, payment_link: eventPaymentLink }
+      {
+        title: eventTitle,
+        date: eventDate,
+        location: eventLocation,
+        price: eventPrice,
+        description: eventDescription,
+        payment_link: eventPaymentLink
+      }
     ])
     if (!error) {
       setEventTitle('')
       setEventDate('')
       setEventLocation('')
+      setEventPrice('')
       setEventDescription('')
       setEventPaymentLink('')
       fetchData()
@@ -156,26 +165,71 @@ export default function AdminPage() {
     fetchData()
   }
 
-  // GESTION DES PROJETS DYNAMIQUES
+  // GESTION DES PROJETS DYNAMIQUES & OPTIONS
   const handleTemplateSelect = (templateId: string) => {
     setSelectedTemplateId(templateId)
     const tmpl = PRESET_TEMPLATES.find(t => t.id === templateId)
     if (tmpl) {
       setProjectEmoji(tmpl.emoji)
       setProjectBadgeTag(tmpl.badge_tag)
-      setCustomFormConfig(tmpl.form_config)
+      // Duplication profonde pour édition indépendante
+      setCustomFormConfig(JSON.parse(JSON.stringify(tmpl.form_config)))
     }
   }
 
   const handleTitleChange = (val: string) => {
     setProjectTitle(val)
-    // Auto-generer un slug propre sans caracteres speciaux
     const generatedSlug = val
       .toLowerCase()
       .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)+/g, '')
     setProjectSlug(generatedSlug)
+  }
+
+  // Helpers de gestion dynamique des options et tarifs
+  const handleAddOptionGroup = () => {
+    const newOpts = [...(customFormConfig.options || [])]
+    newOpts.push({
+      id: `opt_${Date.now()}`,
+      label: 'Choix / Tarifs',
+      choices: [
+        { name: 'Entrée Standard (5,00€)', price: 5.00 },
+        { name: 'Entrée + Boisson (7,00€)', price: 7.00 }
+      ]
+    })
+    setCustomFormConfig({ ...customFormConfig, options: newOpts })
+  }
+
+  const handleRemoveOptionGroup = (optIdx: number) => {
+    const newOpts = [...(customFormConfig.options || [])]
+    newOpts.splice(optIdx, 1)
+    setCustomFormConfig({ ...customFormConfig, options: newOpts })
+  }
+
+  const handleAddChoice = (optIdx: number) => {
+    const newOpts = [...(customFormConfig.options || [])]
+    if (!newOpts[optIdx]) return
+    newOpts[optIdx].choices.push({ name: 'Nouvelle option (5,00€)', price: 5.00 })
+    setCustomFormConfig({ ...customFormConfig, options: newOpts })
+  }
+
+  const handleUpdateChoice = (optIdx: number, choiceIdx: number, field: 'name' | 'price', val: any) => {
+    const newOpts = [...(customFormConfig.options || [])]
+    if (!newOpts[optIdx] || !newOpts[optIdx].choices[choiceIdx]) return
+    if (field === 'name') {
+      newOpts[optIdx].choices[choiceIdx].name = val
+    } else {
+      newOpts[optIdx].choices[choiceIdx].price = parseFloat(val) || 0
+    }
+    setCustomFormConfig({ ...customFormConfig, options: newOpts })
+  }
+
+  const handleRemoveChoice = (optIdx: number, choiceIdx: number) => {
+    const newOpts = [...(customFormConfig.options || [])]
+    if (!newOpts[optIdx]) return
+    newOpts[optIdx].choices.splice(choiceIdx, 1)
+    setCustomFormConfig({ ...customFormConfig, options: newOpts })
   }
 
   const handleCreateProject = async (e: React.FormEvent) => {
@@ -327,12 +381,19 @@ export default function AdminPage() {
             <h2 className="text-xl font-black flex items-center gap-2">📅 Gestion de l'Agenda</h2>
             <form onSubmit={handleAddEvent} className="bg-white border border-[#1B2A4A]/10 rounded-2xl p-6 shadow-sm space-y-3">
               <input type="text" placeholder="Titre de l'événement" value={eventTitle} onChange={e => setEventTitle(e.target.value)} className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" required />
+              
               <div className="grid grid-cols-2 gap-3">
                 <input type="text" placeholder="Date (ex: 25 Sept)" value={eventDate} onChange={e => setEventDate(e.target.value)} className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" required />
-                <input type="text" placeholder="Lieu (ex: Foyer)" value={eventLocation} onChange={e => setEventLocation(e.target.value)} className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" />
+                <input type="text" placeholder="Prix (ex: 5,00€ ou Gratuit)" value={eventPrice} onChange={e => setEventPrice(e.target.value)} className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" />
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <input type="text" placeholder="Lieu (ex: Foyer)" value={eventLocation} onChange={e => setEventLocation(e.target.value)} className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" />
+                <input type="url" placeholder="Lien SumUp / Réservation (optionnel)" value={eventPaymentLink} onChange={e => setEventPaymentLink(e.target.value)} className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" />
+              </div>
+
               <input type="text" placeholder="Description" value={eventDescription} onChange={e => setEventDescription(e.target.value)} className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" />
-              <input type="url" placeholder="Lien de réservation / SumUp (optionnel)" value={eventPaymentLink} onChange={e => setEventPaymentLink(e.target.value)} className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" />
+
               <button type="submit" className="w-full bg-[#1B2A4A] text-white font-bold py-3 rounded-xl hover:bg-[#F26D5B] transition text-sm flex items-center justify-center gap-2">
                 <Plus className="w-4 h-4" /> Publier l'événement
               </button>
@@ -342,7 +403,10 @@ export default function AdminPage() {
               {events.map(event => (
                 <div key={event.id} className="bg-white border border-[#1B2A4A]/10 p-4 rounded-xl flex items-center justify-between">
                   <div>
-                    <p className="font-bold text-sm">{event.title}</p>
+                    <p className="font-bold text-sm">
+                      {event.title}
+                      {event.price && <span className="ml-2 font-bold text-[#F26D5B]">({event.price})</span>}
+                    </p>
                     <p className="text-xs text-[#1B2A4A]/60">{event.date} • {event.location || 'Lieu non spécifié'}</p>
                   </div>
                   <button onClick={() => handleDeleteEvent(event.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
@@ -357,7 +421,7 @@ export default function AdminPage() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="text-xl font-black flex items-center gap-2">🚀 Projets & Opérations Dynamiques</h2>
-              <p className="text-xs text-[#1B2A4A]/60">Créez et gérez vos opérations de réservation/vente avec formulaires sur-mesure.</p>
+              <p className="text-xs text-[#1B2A4A]/60">Créez et gérez vos opérations de réservation/vente avec formulaires sur-mesure et options d'entrées/tarifs.</p>
             </div>
             <button
               onClick={() => setShowCreateModal(true)}
@@ -453,7 +517,7 @@ export default function AdminPage() {
       {/* MODALE DE CRÉATION DE PROJET DYNAMIQUE */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 bg-[#1B2A4A]/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border border-[#1B2A4A]/10 rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl space-y-6 my-8">
+          <div className="bg-white border border-[#1B2A4A]/10 rounded-3xl p-6 md:p-8 max-w-3xl w-full shadow-2xl space-y-6 my-8">
             <div className="flex justify-between items-center border-b border-[#1B2A4A]/10 pb-4">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-[#F26D5B]" />
@@ -467,12 +531,12 @@ export default function AdminPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateProject} className="space-y-5">
+            <form onSubmit={handleCreateProject} className="space-y-6">
               
-              {/* Choix du modèle */}
+              {/* 1. Choix du modèle */}
               <div className="space-y-2">
                 <label className="block text-xs font-bold uppercase tracking-wider text-[#1B2A4A]/70">
-                  1. Sélectionner un modèle de projet (Template)
+                  1. Sélectionner un modèle de départ (Template)
                 </label>
                 <div className="grid sm:grid-cols-2 gap-2">
                   {PRESET_TEMPLATES.map(tmpl => (
@@ -496,7 +560,7 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Infos générales */}
+              {/* 2. Infos générales */}
               <div className="space-y-3 pt-2">
                 <label className="block text-xs font-bold uppercase tracking-wider text-[#1B2A4A]/70">
                   2. Informations Générales
@@ -505,7 +569,7 @@ export default function AdminPage() {
                   <div className="col-span-2">
                     <input
                       type="text"
-                      placeholder="Titre du projet (ex: Vente de Sweats MDLE)"
+                      placeholder="Titre du projet (ex: Bal de Fin d'Année)"
                       value={projectTitle}
                       onChange={e => handleTitleChange(e.target.value)}
                       className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm font-semibold"
@@ -515,7 +579,7 @@ export default function AdminPage() {
                   <div>
                     <input
                       type="text"
-                      placeholder="Emoji (ex: 👕)"
+                      placeholder="Emoji (ex: 🎟️)"
                       value={projectEmoji}
                       onChange={e => setProjectEmoji(e.target.value)}
                       className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm font-semibold text-center"
@@ -528,7 +592,7 @@ export default function AdminPage() {
                     <label className="block text-[10px] font-bold text-[#1B2A4A]/50 mb-1">Identifiant URL (Slug)</label>
                     <input
                       type="text"
-                      placeholder="ex: sweats-mdle"
+                      placeholder="ex: bal-fin-annee"
                       value={projectSlug}
                       onChange={e => setProjectSlug(e.target.value)}
                       className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-xs font-mono"
@@ -539,7 +603,7 @@ export default function AdminPage() {
                     <label className="block text-[10px] font-bold text-[#1B2A4A]/50 mb-1">Tag / Badge</label>
                     <input
                       type="text"
-                      placeholder="ex: Boutique MDLE"
+                      placeholder="ex: Inscription Bal"
                       value={projectBadgeTag}
                       onChange={e => setProjectBadgeTag(e.target.value)}
                       className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-xs font-semibold"
@@ -548,22 +612,110 @@ export default function AdminPage() {
                 </div>
 
                 <textarea
-                  placeholder="Description courte pour les élèves (optionnel)"
+                  placeholder="Description du projet (ex: Réservez votre entrée pour le bal...)"
                   value={projectDescription}
                   onChange={e => setProjectDescription(e.target.value)}
                   className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm h-20"
                 />
               </div>
 
-              {/* Aperçu / Réglages Rapides du Formulaire */}
+              {/* 3. Éditeur Dynamique de Variantes / Tarifs / Types de Paiement */}
               <div className="space-y-3 pt-2 bg-[#FAFAF8] p-4 rounded-2xl border border-[#1B2A4A]/10">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-[#1B2A4A] flex items-center gap-1.5">
-                    <Settings2 className="w-4 h-4 text-[#F26D5B]" /> Paramètres du Formulaire de Réservation
+                    <DollarSign className="w-4 h-4 text-[#F26D5B]" /> Tarifs, Types d'Entrée & Options de Paiement
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleAddOptionGroup}
+                    className="text-[11px] font-bold text-white bg-[#1B2A4A] hover:bg-[#F26D5B] px-3 py-1.5 rounded-lg transition"
+                  >
+                    + Ajouter un groupe d'options
+                  </button>
+                </div>
+
+                {(!customFormConfig.options || customFormConfig.options.length === 0) ? (
+                  <p className="text-xs text-[#1B2A4A]/50 italic">Aucun choix de tarif défini. Cliquez ci-dessus pour ajouter vos prix/entrées.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {customFormConfig.options.map((optGroup, optIdx) => (
+                      <div key={optGroup.id || optIdx} className="bg-white border border-[#1B2A4A]/10 p-3.5 rounded-xl space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <input
+                            type="text"
+                            value={optGroup.label}
+                            onChange={e => {
+                              const newOpts = [...(customFormConfig.options || [])]
+                              newOpts[optIdx].label = e.target.value
+                              setCustomFormConfig({ ...customFormConfig, options: newOpts })
+                            }}
+                            className="text-xs font-bold bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-lg p-2 flex-1"
+                            placeholder="Nom du groupe (ex: Type d'entrée, Couleur...)"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveOptionGroup(optIdx)}
+                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
+                            title="Supprimer ce groupe"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* Liste des choix et tarifs */}
+                        <div className="space-y-2 pl-2">
+                          <p className="text-[10px] font-bold text-[#1B2A4A]/50 uppercase">Choix & Prix unitaires :</p>
+                          {optGroup.choices.map((choice, choiceIdx) => (
+                            <div key={choiceIdx} className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={choice.name}
+                                onChange={e => handleUpdateChoice(optIdx, choiceIdx, 'name', e.target.value)}
+                                placeholder="Nom de l'option (ex: Entrée Classique (5,00€))"
+                                className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-lg p-2 text-xs font-semibold flex-1"
+                              />
+                              <div className="w-28 flex items-center gap-1 bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-lg px-2 py-1.5">
+                                <span className="text-xs text-[#1B2A4A]/60">€</span>
+                                <input
+                                  type="number"
+                                  step="0.50"
+                                  value={choice.price}
+                                  onChange={e => handleUpdateChoice(optIdx, choiceIdx, 'price', e.target.value)}
+                                  className="w-full bg-transparent text-xs font-bold text-right focus:outline-none"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveChoice(optIdx, choiceIdx)}
+                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => handleAddChoice(optIdx)}
+                            className="text-[10px] font-bold text-[#F26D5B] hover:underline mt-1 inline-block"
+                          >
+                            + Ajouter une option de paiement / choix
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 4. Réglages des cases à cocher du Formulaire */}
+              <div className="space-y-3 pt-2 bg-[#FAFAF8] p-4 rounded-2xl border border-[#1B2A4A]/10">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-[#1B2A4A] flex items-center gap-1.5">
+                    <Settings2 className="w-4 h-4 text-[#F26D5B]" /> Options additionnelles du Formulaire
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
-                  <label className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-[#1B2A4A]/5">
+                  <label className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-[#1B2A4A]/5 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={!!customFormConfig.has_receiver}
@@ -572,7 +724,7 @@ export default function AdminPage() {
                     />
                     <span>Demander le destinataire</span>
                   </label>
-                  <label className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-[#1B2A4A]/5">
+                  <label className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-[#1B2A4A]/5 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={!!customFormConfig.allow_quantity}
@@ -581,7 +733,7 @@ export default function AdminPage() {
                     />
                     <span>Sélecteur de quantité</span>
                   </label>
-                  <label className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-[#1B2A4A]/5">
+                  <label className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-[#1B2A4A]/5 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={!!customFormConfig.allow_anonymous}
@@ -590,7 +742,7 @@ export default function AdminPage() {
                     />
                     <span>Option Envoi Anonyme</span>
                   </label>
-                  <label className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-[#1B2A4A]/5">
+                  <label className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-[#1B2A4A]/5 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={!!customFormConfig.allow_message}
@@ -603,7 +755,7 @@ export default function AdminPage() {
               </div>
 
               {/* Bouton de confirmation */}
-              <div className="pt-3 flex justify-end gap-3">
+              <div className="pt-3 flex justify-end gap-3 border-t border-[#1B2A4A]/10">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
