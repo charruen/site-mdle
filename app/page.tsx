@@ -425,7 +425,9 @@ export default function Home() {
         {loading ? (
           <p className="text-[#1B2A4A]/60">Chargement de l'agenda...</p>
         ) : agendaEvents.length === 0 ? (
-          <p className="text-[#1B2A4A]/60">Aucun événement prévu pour le moment.</p>
+          <p className="text-white/60 py-8 text-center bg-white/5 rounded-3xl border border-white/10">
+            Aucune date importante prévu pour le moment.
+          </p>
         ) : (
           <div className="flex flex-col gap-4">
             {agendaEvents.map((event) => (
@@ -493,7 +495,9 @@ export default function Home() {
         </div>
 
         {activeProjects.length === 0 ? (
-          <p className="text-[#1B2A4A]/60 text-sm font-medium">Aucune opération active pour le moment.</p>
+          <p className="text-white/60 py-8 text-center bg-white/5 rounded-3xl border border-white/10">
+            Aucun événement en cours pour le moment.
+          </p>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {activeProjects.map((proj) => (
