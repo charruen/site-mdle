@@ -493,7 +493,7 @@ export default function Home() {
         </div>
 
         {activeProjects.length === 0 ? (
-          <p className="text-[#1B2A4A]/60 text-sm font-medium">Aucun événement actif pour le moment.</p>
+          <p className="text-[#1B2A4A]/60">Aucun événement actif pour le moment.</p>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {activeProjects.map((proj) => (
