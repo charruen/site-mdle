@@ -347,7 +347,8 @@ export default function AdminPage() {
               <div className="grid grid-cols-2 gap-3">
                 <select value={newCategory} onChange={e => setNewCategory(e.target.value)} className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm font-semibold">
                   <option value="Boissons">Boissons</option>
-                  <option value="Snacks">Snacks</option>
+                  <option value="Snacks sucrés">Snacks sucrés</option>
+                  <option value="Snacks salés">Snacks salés</option>
                   <option value="Formules">Formules</option>
                 </select>
                 <input type="text" placeholder="Prix (ex: 1,50€)" value={newPrice} onChange={e => setNewPrice(e.target.value)} className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" required />
