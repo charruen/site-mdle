@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { href: "#infos", label: "Infos & Bureau" },
   { href: "#carte", label: "La Carte" },
   { href: "#agenda", label: "Agenda" },
+  { href: "#projets", label: "Projets & Ventes" },
   { href: "#contact", label: "Contact" },
 ];
 
@@ -35,6 +36,7 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [agendaEvents, setAgendaEvents] = useState<any[]>([]);
+  const [activeProjects, setActiveProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -52,6 +54,42 @@ export default function Home() {
         .from("events")
         .select("*")
         .order("id");
+
+      // Récupération des projets actifs depuis Supabase
+      try {
+        const { data: projData } = await supabase
+          .from("projects")
+          .select("*")
+          .eq("is_active", true)
+          .order("id", { ascending: false });
+
+        if (projData && projData.length > 0) {
+          setActiveProjects(projData);
+        } else {
+          // Fallback avec l'opération Roses par défaut
+          setActiveProjects([
+            {
+              id: 1,
+              slug: "roses",
+              title: "Vente de Roses (St-Valentin)",
+              emoji: "🌹",
+              badge_tag: "Opération Saint-Valentin",
+              description: "Réservation de roses avec envoi de mots doux et livraison en classe."
+            }
+          ]);
+        }
+      } catch {
+        setActiveProjects([
+          {
+            id: 1,
+            slug: "roses",
+            title: "Vente de Roses (St-Valentin)",
+            emoji: "🌹",
+            badge_tag: "Opération Saint-Valentin",
+            description: "Réservation de roses avec envoi de mots doux et livraison en classe."
+          }
+        ]);
+      }
 
       if (menuData) setMenuItems(menuData);
       if (agendaData) setAgendaEvents(agendaData);
@@ -419,6 +457,61 @@ export default function Home() {
                       Payer sur SumUp →
                     </a>
                   )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* PROJETS & OPÉRATIONS EN COURS */}
+      <section id="projets" className="max-w-6xl mx-auto px-5 pb-20 md:pb-28">
+        <div className="mb-10">
+          <span className="text-xs font-bold uppercase tracking-widest text-[#F26D5B]">
+            Opérations & Réservations
+          </span>
+          <h2 className="text-3xl md:text-5xl font-black tracking-tight mt-1">
+            Projets & Ventes en Cours
+          </h2>
+          <p className="text-[#1B2A4A]/60 text-sm mt-2">
+            Participe aux opérations de la MDLE et effectue tes réservations directement en ligne.
+          </p>
+        </div>
+
+        {activeProjects.length === 0 ? (
+          <p className="text-[#1B2A4A]/60 text-sm font-medium">Aucune opération active pour le moment.</p>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {activeProjects.map((proj) => (
+              <div
+                key={proj.id}
+                className="bg-white border border-[#1B2A4A]/10 rounded-3xl p-6 shadow-sm hover:shadow-xl hover:border-[#F26D5B]/30 transition-all flex flex-col justify-between space-y-4 group"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <span className="text-4xl">{proj.emoji || "🚀"}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#F26D5B] bg-[#F26D5B]/10 px-2.5 py-1 rounded-full">
+                      {proj.badge_tag || "Opération MDLE"}
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-black text-[#1B2A4A] group-hover:text-[#F26D5B] transition-colors">
+                    {proj.title}
+                  </h3>
+                  {proj.description && (
+                    <p className="text-xs text-[#1B2A4A]/60 mt-2 line-clamp-3 leading-relaxed">
+                      {proj.description}
+                    </p>
+                  )}
+                </div>
+
+                <div className="pt-4 border-t border-[#1B2A4A]/8">
+                  <a
+                    href={`/p/${proj.slug}`}
+                    className="w-full bg-[#1B2A4A] hover:bg-[#F26D5B] text-white font-bold py-3 px-4 rounded-2xl transition-colors text-xs flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    <span>Réserver / Commander</span>
+                    <span className="group-hover:translate-x-1 transition-transform">→</span>
+                  </a>
                 </div>
               </div>
             ))}
