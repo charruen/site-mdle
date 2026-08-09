@@ -492,7 +492,9 @@ export default function Home() {
           </p>
         </div>
 
-        {activeProjects.length === 0 ? (
+        {loading ? (
+          <p className="text-[#1B2A4A]/60">Chargement des opérations en cours...</p>
+        ) : activeProjects.length === 0 ? (
           <p className="text-[#1B2A4A]/60">Aucun événement actif pour le moment.</p>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
