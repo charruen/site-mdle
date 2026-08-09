@@ -32,12 +32,21 @@ const BUREAU_MEMBERS = [
   { role: "Secrétaire", name: "À définir", emoji: "📝" },
 ];
 
+const CATEGORIES = [
+  "TOUT",
+  "Boissons",
+  "Snacks sucrés",
+  "Snacks salés",
+  "Formules",
+];
+
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [agendaEvents, setAgendaEvents] = useState<any[]>([]);
   const [activeProjects, setActiveProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>("TOUT");
 
   useEffect(() => {
     async function fetchData() {
@@ -81,9 +90,14 @@ export default function Home() {
     fetchData();
   }, []);
 
+  // Filtrage des produits selon la catégorie sélectionnée
+  const filteredMenuItems = selectedCategory === "TOUT"
+    ? menuItems
+    : menuItems.filter((item) => item.category === selectedCategory);
+
   return (
     <div className="min-h-screen bg-[#FAFAF8] text-[#1B2A4A] font-sans antialiased">
-{/* Header */}
+      {/* Header */}
       <header className="sticky top-0 z-50 border-b border-[#1B2A4A]/10 bg-[#FAFAF8]/90 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-5 py-4 flex justify-between items-center">
           <a href="#" className="flex items-center gap-2.5 group">
@@ -125,28 +139,24 @@ export default function Home() {
             className="md:hidden flex flex-col justify-center items-center w-10 h-10 gap-1.5"
           >
             <span
-              className={`block w-6 h-0.5 rounded-full bg-[#1B2A4A] transition-transform ${
-                menuOpen ? "rotate-45 translate-y-2" : ""
-              }`}
+              className={`block w-6 h-0.5 rounded-full bg-[#1B2A4A] transition-transform ${menuOpen ? "rotate-45 translate-y-2" : ""
+                }`}
             />
             <span
-              className={`block w-6 h-0.5 rounded-full bg-[#1B2A4A] transition-opacity ${
-                menuOpen ? "opacity-0" : ""
-              }`}
+              className={`block w-6 h-0.5 rounded-full bg-[#1B2A4A] transition-opacity ${menuOpen ? "opacity-0" : ""
+                }`}
             />
             <span
-              className={`block w-6 h-0.5 rounded-full bg-[#1B2A4A] transition-transform ${
-                menuOpen ? "-rotate-45 -translate-y-2" : ""
-              }`}
+              className={`block w-6 h-0.5 rounded-full bg-[#1B2A4A] transition-transform ${menuOpen ? "-rotate-45 -translate-y-2" : ""
+                }`}
             />
           </button>
         </div>
 
         {/* Mobile nav */}
         <div
-          className={`md:hidden overflow-hidden transition-[max-height] duration-300 ease-in-out ${
-            menuOpen ? "max-h-64" : "max-h-0"
-          }`}
+          className={`md:hidden overflow-hidden transition-[max-height] duration-300 ease-in-out ${menuOpen ? "max-h-64" : "max-h-0"
+            }`}
         >
           <nav className="flex flex-col gap-1 px-5 pb-4 text-sm font-semibold">
             {NAV_LINKS.map((link) => (
@@ -160,7 +170,7 @@ export default function Home() {
               </a>
             ))}
             <a
-              href="https://www.sumup.com/fr-fr/" // 👈 Remplace aussi le lien ici pour le menu mobile
+              href="https://www.sumup.com/fr-fr/"
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setMenuOpen(false)}
@@ -207,7 +217,7 @@ export default function Home() {
 
           <div className="mt-10 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <p className="max-w-md text-[#1B2A4A]/60 text-base leading-relaxed">
-              La Maison des Lycéens, c'est l'asso gérée par des élèves, pour les élèves.
+              La Maison des Lycéens et des Étudiants, c'est l'asso gérée par des élèves, pour les élèves.
               Foyer, projets, cafétéria et événements au Lycée Polyvalent Jean Perrin.
             </p>
 
@@ -322,10 +332,10 @@ export default function Home() {
         </div>
       </section>
 
-      {/* LA CARTE (Cafétéria) - DYNAMIQUE */}
+      {/* LA CARTE (Cafétéria) - DYNAMIQUE AVEC FILTRES */}
       <section id="carte" className="bg-[#1B2A4A] text-white py-20 md:py-28 rounded-[2.5rem] md:rounded-[3rem] mx-3 md:mx-5">
         <div className="max-w-6xl mx-auto px-6 md:px-10">
-          <div className="mb-12">
+          <div className="mb-8">
             <span className="text-xs font-bold uppercase tracking-widest text-[#F2A63C]">
               Foyer & Cafétéria
             </span>
@@ -333,22 +343,40 @@ export default function Home() {
               La Carte de la MDLE
             </h2>
             <p className="text-white/50 text-sm mt-2 max-w-md">
-              Disponible à la vente pendant les récrés et la pause du midi.
+              Disponible à la vente pendant les horaires d'ouverture du foyer.
             </p>
+          </div>
+
+          {/* BARRE DE FILTRES */}
+          <div className="flex flex-wrap gap-2 mb-10">
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${selectedCategory === cat
+                    ? "bg-[#F2A63C] text-[#1B2A4A] shadow-md scale-105"
+                    : "bg-white/10 text-white/80 hover:bg-white/20 border border-white/10"
+                  }`}
+              >
+                {cat}
+              </button>
+            ))}
           </div>
 
           {loading ? (
             <p className="text-white/60">Chargement de la carte depuis la base de données...</p>
-          ) : menuItems.length === 0 ? (
-            <p className="text-white/60">Aucun produit dans la carte pour l'instant.</p>
+          ) : filteredMenuItems.length === 0 ? (
+            <p className="text-white/60 py-8 text-center bg-white/5 rounded-3xl border border-white/10">
+              Aucun produit trouvé dans cette catégorie.
+            </p>
           ) : (
             <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {menuItems.map((item) => (
+              {filteredMenuItems.map((item) => (
                 <div
                   key={item.id}
-                  className={`bg-white/5 border rounded-3xl p-6 backdrop-blur-sm flex flex-col justify-between transition-opacity ${
-                    item.is_available ? "border-white/10" : "border-red-500/30 opacity-60"
-                  }`}
+                  className={`bg-white/5 border rounded-3xl p-6 backdrop-blur-sm flex flex-col justify-between transition-opacity ${item.is_available ? "border-white/10" : "border-red-500/30 opacity-60"
+                    }`}
                 >
                   <div>
                     <div className="flex justify-between items-start gap-2">
@@ -365,7 +393,7 @@ export default function Home() {
                       {item.title}
                     </h3>
                     {item.description && (
-                      <p className="text-xs text-white/50 mt-1">{item.description}</p>
+                      <p className="text-xs text-white/50 mt-1 whitespace-pre-line">{item.description}</p>
                     )}
                   </div>
                   <div className="mt-4 pt-3 border-t border-white/10 flex justify-between items-center">
@@ -417,7 +445,7 @@ export default function Home() {
                       {event.title}
                     </h3>
                     {event.description && (
-                      <p className="text-sm text-[#1B2A4A]/55 mt-1">{event.description}</p>
+                      <p className="text-sm text-[#1B2A4A]/55 mt-1 whitespace-pre-line">{event.description}</p>
                     )}
                   </div>
                 </div>
@@ -484,7 +512,7 @@ export default function Home() {
                     {proj.title}
                   </h3>
                   {proj.description && (
-                    <p className="text-xs text-[#1B2A4A]/60 mt-2 line-clamp-3 leading-relaxed">
+                    <p className="text-xs text-[#1B2A4A]/60 mt-2 line-clamp-3 leading-relaxed whitespace-pre-line">
                       {proj.description}
                     </p>
                   )}
@@ -508,7 +536,7 @@ export default function Home() {
       {/* Footer / Contact */}
       <footer id="contact" className="bg-[#1B2A4A] text-white rounded-t-[2.5rem] md:rounded-t-[3rem] mx-3 md:mx-5">
         <div className="max-w-6xl mx-auto px-6 md:px-10 py-14 grid md:grid-cols-2 gap-10 items-center">
-          
+
           {/* Colonne Gauche : Infos & Liens */}
           <div className="space-y-6">
             <div className="flex items-center gap-3">
