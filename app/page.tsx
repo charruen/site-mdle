@@ -122,7 +122,7 @@ export default function Home() {
               </a>
             ))}
             <a
-              href="https://www.sumup.com/fr-fr/"
+              href="/adherer"
               target="_blank"
               rel="noopener noreferrer"
               className="bg-[#1B2A4A] text-white px-5 py-2.5 rounded-full hover:bg-[#F26D5B] transition-colors shadow-sm font-bold flex items-center gap-2"
