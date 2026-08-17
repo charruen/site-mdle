@@ -280,21 +280,25 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Marquee */}
-      <div className="bg-[#1B2A4A] text-white py-3 overflow-hidden whitespace-nowrap">
-        <div className="inline-block animate-[marquee_22s_linear_infinite]">
-          {[...Array(2)].map((_, loop) => (
-            <span key={loop}>
-              {MARQUEE_WORDS.map((word, i) => (
-                <span
-                  key={`${loop}-${i}`}
-                  className="mx-6 text-sm font-bold uppercase tracking-widest inline-flex items-center gap-6"
-                >
-                  {word}
-                  <span className="text-[#F2A63C]">✦</span>
-                </span>
+      {/* Bandeau défilant à raccord continu */}
+      <div className="bg-[#1B2A4A] text-white py-3 overflow-hidden" aria-label="Actualités de la MDLE">
+        <div className="marquee-track flex w-max whitespace-nowrap">
+          {[0, 1].map((groupIndex) => (
+            <div key={groupIndex} className="flex shrink-0" aria-hidden={groupIndex === 1}>
+              {[0, 1].map((repeatIndex) => (
+                <React.Fragment key={repeatIndex}>
+                  {MARQUEE_WORDS.map((word, wordIndex) => (
+                    <span
+                      key={`${groupIndex}-${repeatIndex}-${wordIndex}`}
+                      className="mx-6 inline-flex items-center gap-6 text-sm font-bold uppercase tracking-widest"
+                    >
+                      {word}
+                      <span className="text-[#F2A63C]">✦</span>
+                    </span>
+                  ))}
+                </React.Fragment>
               ))}
-            </span>
+            </div>
           ))}
         </div>
       </div>
@@ -660,6 +664,17 @@ export default function Home() {
         @keyframes marquee {
           from { transform: translateX(0); }
           to { transform: translateX(-50%); }
+        }
+
+        .marquee-track {
+          animation: marquee 32s linear infinite;
+          will-change: transform;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .marquee-track {
+            animation: none;
+          }
         }
       `}</style>
     </div>
