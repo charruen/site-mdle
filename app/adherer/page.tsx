@@ -56,7 +56,7 @@ export default function AdhererPage() {
                         Rejoins la MDL
                     </h1>
                     <p className="text-[#1B2A4A]/60 text-sm">
-                        10€ pour l'année, pour soutenir la vie du lycée.
+                        10€ pour l’année, pour soutenir la vie du lycée.
                     </p>
                 </div>
 
@@ -136,9 +136,9 @@ export default function AdhererPage() {
                             <div className="w-14 h-14 rounded-full bg-[#2E8B7A]/10 flex items-center justify-center mx-auto mb-4 text-2xl">
                                 ✅
                             </div>
-                            <h2 className="font-black text-lg mb-2">C'est presque fini !</h2>
+                            <h2 className="font-black text-lg mb-2">C’est presque fini !</h2>
                             <p className="text-sm text-[#1B2A4A]/60 mb-6 leading-relaxed">
-                                Il ne reste plus qu'à régler ton adhésion de 10€ sur SumUp.
+                                Il ne reste plus qu’à régler ton adhésion de 10€ sur SumUp.
                             </p>
                             <a
                                 href={SUMUP_LINK}

@@ -1,13 +1,33 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Plus, Trash2, Lock, LogOut, ExternalLink, Copy, Check, Sparkles, X, Settings2, DollarSign, Pencil } from 'lucide-react'
 import { Project, PRESET_TEMPLATES, ProjectFormConfig } from '@/lib/projects'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+type MenuItem = {
+  id: number
+  title: string
+  category: string
+  price: string
+  description: string | null
+  is_available: boolean
+}
+
+type EventItem = {
+  id: number
+  title: string
+  date: string
+  location: string | null
+  price: string | null
+  description: string | null
+  payment_link: string | null
+}
+
+type DashboardPayload = {
+  menuItems: MenuItem[]
+  events: EventItem[]
+  projects: Project[]
+}
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -16,10 +36,9 @@ export default function AdminPage() {
   const [loginLoading, setLoginLoading] = useState(false)
 
   // Gestion des tables
-  const [menuItems, setMenuItems] = useState<any[]>([])
-  const [events, setEvents] = useState<any[]>([])
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([])
+  const [events, setEvents] = useState<EventItem[]>([])
   const [projects, setProjects] = useState<Project[]>([])
-  const [loading, setLoading] = useState(false)
   const [tableMissingWarning, setTableMissingWarning] = useState(false)
 
   // Formulaire Produit / Édition
@@ -51,13 +70,40 @@ export default function AdminPage() {
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null)
   const [creatingProject, setCreatingProject] = useState(false)
 
-  useEffect(() => {
-    const authStatus = localStorage.getItem('mdle_admin_auth')
-    if (authStatus === 'true') {
-      setIsAuthenticated(true)
-      fetchData()
+  const fetchData = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/manage', { cache: 'no-store' })
+      if (response.status === 401) {
+        setIsAuthenticated(false)
+        return
+      }
+      if (!response.ok) {
+        throw new Error('Chargement impossible')
+      }
+
+      const data = await response.json() as DashboardPayload
+      setMenuItems(data.menuItems)
+      setEvents(data.events)
+      setProjects(data.projects)
+      setTableMissingWarning(false)
+    } catch {
+      setTableMissingWarning(true)
+    } finally {
+      // L’interface reste utilisable pendant le rafraîchissement des données.
     }
   }, [])
+
+  useEffect(() => {
+    async function checkSession() {
+      const response = await fetch('/api/admin/session', { cache: 'no-store' })
+      if (response.ok) {
+        setIsAuthenticated(true)
+        await fetchData()
+      }
+    }
+
+    void checkSession()
+  }, [fetchData])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -65,20 +111,20 @@ export default function AdminPage() {
     setLoginLoading(true)
 
     try {
-      const res = await fetch('/api/admin/login', {
+      const response = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: passwordInput }),
       })
 
-      if (res.ok) {
-        setIsAuthenticated(true)
-        localStorage.setItem('mdle_admin_auth', 'true')
-        setPasswordInput('')
-        fetchData()
-      } else {
+      if (!response.ok) {
         setPasswordError(true)
+        return
       }
+
+      setIsAuthenticated(true)
+      setPasswordInput('')
+      await fetchData()
     } catch {
       setPasswordError(true)
     } finally {
@@ -86,48 +132,46 @@ export default function AdminPage() {
     }
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await fetch('/api/admin/login', { method: 'DELETE' })
     setIsAuthenticated(false)
-    localStorage.removeItem('mdle_admin_auth')
   }
 
-  const fetchData = async () => {
-    setLoading(true)
-    const { data: menuData } = await supabase.from('menu_items').select('*').order('id')
-    const { data: eventData } = await supabase.from('events').select('*').order('id')
+  const adminMutation = async (
+    method: 'POST' | 'PATCH' | 'DELETE',
+    body?: Record<string, unknown>,
+    query?: string,
+  ) => {
+    const response = await fetch(`/api/admin/manage${query ?? ''}`, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    })
 
-    if (menuData) setMenuItems(menuData)
-    if (eventData) setEvents(eventData)
-
-    try {
-      const { data: projectData, error: projError } = await supabase.from('projects').select('*').order('id')
-      if (!projError && projectData) {
-        setProjects(projectData)
-        setTableMissingWarning(false)
-      } else {
-        setTableMissingWarning(true)
-      }
-    } catch {
-      setTableMissingWarning(true)
+    if (!response.ok) {
+      const result = await response.json() as { error?: string }
+      throw new Error(result.error || 'Opération impossible.')
     }
 
-    setLoading(false)
+    await fetchData()
   }
 
   // --- PRODUITS (CARTE) ---
   const handleAddMenuItem = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newTitle || !newPrice) return
-    const { error } = await supabase.from('menu_items').insert([
-      { title: newTitle, category: newCategory, price: newPrice, description: newDescription, is_available: true }
-    ])
-    if (!error) {
+    try {
+      await adminMutation('POST', {
+        resource: 'menu_items',
+        data: { title: newTitle, category: newCategory, price: newPrice, description: newDescription, is_available: true },
+      })
       cancelEditMenuItem()
-      fetchData()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Impossible d’ajouter le produit.')
     }
   }
 
-  const startEditMenuItem = (item: any) => {
+  const startEditMenuItem = (item: MenuItem) => {
     setEditingMenuItemId(item.id)
     setNewTitle(item.title || '')
     setNewCategory(item.category || 'Boissons')
@@ -146,53 +190,63 @@ export default function AdminPage() {
   const handleUpdateMenuItem = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingMenuItemId || !newTitle || !newPrice) return
-    const { error } = await supabase
-      .from('menu_items')
-      .update({
-        title: newTitle,
-        category: newCategory,
-        price: newPrice,
-        description: newDescription
+    try {
+      await adminMutation('PATCH', {
+        resource: 'menu_items',
+        id: editingMenuItemId,
+        data: { title: newTitle, category: newCategory, price: newPrice, description: newDescription, is_available: true },
       })
-      .eq('id', editingMenuItemId)
-
-    if (!error) {
       cancelEditMenuItem()
-      fetchData()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Impossible de mettre à jour le produit.')
     }
   }
 
   const toggleAvailability = async (id: number, currentStatus: boolean) => {
-    await supabase.from('menu_items').update({ is_available: !currentStatus }).eq('id', id)
-    fetchData()
+    const item = menuItems.find((menuItem) => menuItem.id === id)
+    if (!item) return
+    try {
+      await adminMutation('PATCH', {
+        resource: 'menu_items',
+        id,
+        data: { ...item, is_available: !currentStatus },
+      })
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Impossible de modifier la disponibilité.')
+    }
   }
 
   const handleDeleteMenuItem = async (id: number) => {
-    await supabase.from('menu_items').delete().eq('id', id)
-    fetchData()
+    try {
+      await adminMutation('DELETE', undefined, `?resource=menu_items&id=${id}`)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Impossible de supprimer le produit.')
+    }
   }
 
   // --- ÉVÉNEMENTS (AGENDA) ---
   const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!eventTitle || !eventDate) return
-    const { error } = await supabase.from('events').insert([
-      {
-        title: eventTitle,
-        date: eventDate,
-        location: eventLocation,
-        price: eventPrice,
-        description: eventDescription,
-        payment_link: eventPaymentLink
-      }
-    ])
-    if (!error) {
+    try {
+      await adminMutation('POST', {
+        resource: 'events',
+        data: {
+          title: eventTitle,
+          date: eventDate,
+          location: eventLocation,
+          price: eventPrice,
+          description: eventDescription,
+          payment_link: eventPaymentLink,
+        },
+      })
       cancelEditEvent()
-      fetchData()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Impossible d’ajouter l’événement.')
     }
   }
 
-  const startEditEvent = (event: any) => {
+  const startEditEvent = (event: EventItem) => {
     setEditingEventId(event.id)
     setEventTitle(event.title || '')
     setEventDate(event.date || '')
@@ -215,27 +269,31 @@ export default function AdminPage() {
   const handleUpdateEvent = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingEventId || !eventTitle || !eventDate) return
-    const { error } = await supabase
-      .from('events')
-      .update({
-        title: eventTitle,
-        date: eventDate,
-        location: eventLocation,
-        price: eventPrice,
-        description: eventDescription,
-        payment_link: eventPaymentLink
+    try {
+      await adminMutation('PATCH', {
+        resource: 'events',
+        id: editingEventId,
+        data: {
+          title: eventTitle,
+          date: eventDate,
+          location: eventLocation,
+          price: eventPrice,
+          description: eventDescription,
+          payment_link: eventPaymentLink,
+        },
       })
-      .eq('id', editingEventId)
-
-    if (!error) {
       cancelEditEvent()
-      fetchData()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Impossible de mettre à jour l’événement.')
     }
   }
 
   const handleDeleteEvent = async (id: number) => {
-    await supabase.from('events').delete().eq('id', id)
-    fetchData()
+    try {
+      await adminMutation('DELETE', undefined, `?resource=events&id=${id}`)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Impossible de supprimer l’événement.')
+    }
   }
 
   // GESTION DES PROJETS DYNAMIQUES & OPTIONS
@@ -285,7 +343,7 @@ export default function AdminPage() {
     setCustomFormConfig({ ...customFormConfig, options: newOpts })
   }
 
-  const handleUpdateChoice = (optIdx: number, choiceIdx: number, field: 'name' | 'price', val: any) => {
+  const handleUpdateChoice = (optIdx: number, choiceIdx: number, field: 'name' | 'price', val: string) => {
     const newOpts = [...(customFormConfig.options || [])]
     if (!newOpts[optIdx] || !newOpts[optIdx].choices[choiceIdx]) return
     if (field === 'name') {
@@ -308,40 +366,52 @@ export default function AdminPage() {
     if (!projectTitle || !projectSlug) return
 
     setCreatingProject(true)
-    const { error } = await supabase.from('projects').insert([
-      {
-        title: projectTitle,
-        slug: projectSlug,
-        emoji: projectEmoji || '🚀',
-        badge_tag: projectBadgeTag || 'Opération MDLE',
-        description: projectDescription,
-        is_active: true,
-        has_reservation_form: true,
-        form_config: customFormConfig
-      }
-    ])
-
-    if (!error) {
+    try {
+      await adminMutation('POST', {
+        resource: 'projects',
+        data: {
+          title: projectTitle,
+          slug: projectSlug,
+          emoji: projectEmoji || '🚀',
+          badge_tag: projectBadgeTag || 'Opération MDLE',
+          description: projectDescription,
+          is_active: true,
+          has_reservation_form: true,
+          form_config: customFormConfig,
+        },
+      })
       setShowCreateModal(false)
       setProjectTitle('')
       setProjectSlug('')
       setProjectDescription('')
-      fetchData()
-    } else {
-      alert("Erreur lors de la création du projet. Vérifiez que la table 'projects' existe dans Supabase.")
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Impossible de créer le projet.')
+    } finally {
+      setCreatingProject(false)
     }
-    setCreatingProject(false)
   }
 
   const toggleProjectActive = async (id: number, currentStatus: boolean) => {
-    await supabase.from('projects').update({ is_active: !currentStatus }).eq('id', id)
-    fetchData()
+    const project = projects.find((item) => item.id === id)
+    if (!project) return
+    try {
+      await adminMutation('PATCH', {
+        resource: 'projects',
+        id,
+        data: { ...project, is_active: !currentStatus },
+      })
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Impossible de modifier le projet.')
+    }
   }
 
   const handleDeleteProject = async (id: number, title: string) => {
     if (confirm(`Supprimer définitivement le projet « ${title} » et toutes ses réservations ?`)) {
-      await supabase.from('projects').delete().eq('id', id)
-      fetchData()
+      try {
+        await adminMutation('DELETE', undefined, `?resource=projects&id=${id}`)
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Impossible de supprimer le projet.')
+      }
     }
   }
 
@@ -398,7 +468,7 @@ export default function AdminPage() {
         <div className="flex justify-between items-center mb-10 pb-6 border-b border-[#1B2A4A]/10">
           <div>
             <h1 className="text-3xl font-black tracking-tight">Panneau de Gestion MDLE</h1>
-            <p className="text-xs text-[#1B2A4A]/60 mt-1">Gestion de la cafétéria, de l'agenda et des projets de réservation</p>
+            <p className="text-xs text-[#1B2A4A]/60 mt-1">Gestion de la cafétéria, de l’agenda et des projets de réservation</p>
           </div>
           <button
             onClick={handleLogout}
@@ -476,12 +546,12 @@ export default function AdminPage() {
 
           {/* SECTION AGENDA */}
           <div className="space-y-6">
-            <h2 className="text-xl font-black flex items-center gap-2">📅 Gestion de l'Agenda</h2>
+            <h2 className="text-xl font-black flex items-center gap-2">📅 Gestion de l’Agenda</h2>
 
             <form onSubmit={editingEventId ? handleUpdateEvent : handleAddEvent} className="bg-white border border-[#1B2A4A]/10 rounded-2xl p-6 shadow-sm space-y-3">
               {editingEventId && (
                 <div className="flex items-center justify-between bg-[#F26D5B]/10 p-3 rounded-xl border border-[#F26D5B]/20 text-xs text-[#F26D5B] font-bold">
-                  <span>✏️ Modification de l'événement en cours</span>
+                  <span>✏️ Modification de l’événement en cours</span>
                   <button type="button" onClick={cancelEditEvent} className="underline hover:text-[#1B2A4A]">Annuler</button>
                 </div>
               )}
@@ -546,7 +616,7 @@ export default function AdminPage() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="text-xl font-black flex items-center gap-2">🚀 Projets & Opérations Dynamiques</h2>
-              <p className="text-xs text-[#1B2A4A]/60">Créez et gérez vos opérations de réservation/vente avec formulaires sur-mesure et options d'entrées/tarifs.</p>
+              <p className="text-xs text-[#1B2A4A]/60">Créez et gérez vos opérations de réservation/vente avec formulaires sur-mesure et options d’entrées/tarifs.</p>
             </div>
             <button
               onClick={() => setShowCreateModal(true)}
@@ -567,7 +637,7 @@ export default function AdminPage() {
 
             {projects.length === 0 && (
               <div className="col-span-full bg-white border border-[#1B2A4A]/10 p-8 rounded-2xl text-center space-y-2">
-                <p className="text-sm font-bold text-[#1B2A4A]">Aucun projet créé pour l'instant.</p>
+                <p className="text-sm font-bold text-[#1B2A4A]">Aucun projet créé pour l’instant.</p>
                 <p className="text-xs text-[#1B2A4A]/60">Cliquez sur « Créer un nouveau Projet » ci-dessus pour lancer votre première opération.</p>
               </div>
             )}
@@ -747,14 +817,14 @@ export default function AdminPage() {
                 <div className="space-y-3 pt-2 bg-[#FAFAF8] p-4 rounded-2xl border border-[#1B2A4A]/10">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-[#1B2A4A] flex items-center gap-1.5">
-                      <DollarSign className="w-4 h-4 text-[#F26D5B]" /> Tarifs, Types d'Entrée & Options de Paiement
+                      <DollarSign className="w-4 h-4 text-[#F26D5B]" /> Tarifs, Types d’Entrée & Options de Paiement
                     </span>
                     <button
                       type="button"
                       onClick={handleAddOptionGroup}
                       className="text-[11px] font-bold text-white bg-[#1B2A4A] hover:bg-[#F26D5B] px-3 py-1.5 rounded-lg transition"
                     >
-                      + Ajouter un groupe d'options
+                      + Ajouter un groupe d’options
                     </button>
                   </div>
 

@@ -1,12 +1,13 @@
 "use client";
 
+import Image from "next/image";
 import React, { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 // Initialisation Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 const NAV_LINKS = [
   { href: "#infos", label: "Infos & Bureau" },
@@ -40,17 +41,49 @@ const CATEGORIES = [
   "Formules",
 ];
 
+type MenuItem = {
+  id: number;
+  title: string;
+  category: string;
+  price: string;
+  description: string | null;
+  is_available: boolean;
+};
+
+type AgendaEvent = {
+  id: number;
+  title: string;
+  date: string;
+  location: string | null;
+  description: string | null;
+  payment_link: string | null;
+  price: string | null;
+};
+
+type ActiveProject = {
+  id: number;
+  slug: string;
+  title: string;
+  description: string | null;
+  emoji: string | null;
+  badge_tag: string | null;
+};
+
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [menuItems, setMenuItems] = useState<any[]>([]);
-  const [agendaEvents, setAgendaEvents] = useState<any[]>([]);
-  const [activeProjects, setActiveProjects] = useState<any[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [agendaEvents, setAgendaEvents] = useState<AgendaEvent[]>([]);
+  const [activeProjects, setActiveProjects] = useState<ActiveProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>("TOUT");
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
+      if (!supabase) {
+        setLoading(false);
+        return;
+      }
 
       // Récupération de la carte depuis Supabase
       const { data: menuData } = await supabase
@@ -101,9 +134,11 @@ export default function Home() {
       <header className="sticky top-0 z-50 border-b border-[#1B2A4A]/10 bg-[#FAFAF8]/90 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-5 py-4 flex justify-between items-center">
           <a href="#" className="flex items-center gap-2.5 group">
-            <img
+            <Image
               src="/logo-mdle.png"
               alt="Logo MDLE Jean Perrin"
+              width={36}
+              height={36}
               className="w-9 h-9 rounded-full object-cover shrink-0 group-hover:scale-105 transition-transform"
             />
             <span className="text-lg font-black tracking-tight">
@@ -170,7 +205,7 @@ export default function Home() {
               </a>
             ))}
             <a
-              href="https://www.sumup.com/fr-fr/"
+              href="/adherer"
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setMenuOpen(false)}
@@ -217,7 +252,7 @@ export default function Home() {
 
           <div className="mt-10 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <p className="max-w-md text-[#1B2A4A]/60 text-base leading-relaxed">
-              La Maison des Lycéens et des Étudiants, c'est l'asso gérée par des élèves, pour les élèves.
+              La Maison des Lycéens et des Étudiants, c’est l’asso gérée par des élèves, pour les élèves.
               Foyer, projets, cafétéria et événements au Lycée Polyvalent Jean Perrin.
             </p>
 
@@ -287,7 +322,7 @@ export default function Home() {
                   🕒
                 </span>
                 <div>
-                  <p className="font-bold">Horaires d'ouverture</p>
+                  <p className="font-bold">Horaires d’ouverture</p>
                   <p className="text-[#1B2A4A]/60">Lundi 9h - 17h</p>
                   <p className="text-[#1B2A4A]/60">Mardi 9h - 17h</p>
                   <p className="text-[#1B2A4A]/60">Mercredi 9h - 12h</p>
@@ -343,7 +378,7 @@ export default function Home() {
               La Carte de la MDLE
             </h2>
             <p className="text-white/50 text-sm mt-2 max-w-md">
-              Disponible à la vente pendant les horaires d'ouverture du foyer.
+              Disponible à la vente pendant les horaires d’ouverture du foyer.
             </p>
           </div>
 
@@ -423,7 +458,7 @@ export default function Home() {
         </div>
 
         {loading ? (
-          <p className="text-[#1B2A4A]/60">Chargement de l'agenda...</p>
+          <p className="text-[#1B2A4A]/60">Chargement de l’agenda...</p>
         ) : agendaEvents.length === 0 ? (
           <p className="text-[#1B2A4A]/60">Aucune date importante prévu pour le moment.</p>
         ) : (
@@ -542,9 +577,11 @@ export default function Home() {
           {/* Colonne Gauche : Infos & Liens */}
           <div className="space-y-6">
             <div className="flex items-center gap-3">
-              <img
+              <Image
                 src="/logo-mdle.png"
                 alt="Logo MDLE Jean Perrin"
+                width={40}
+                height={40}
                 className="w-10 h-10 rounded-full object-cover shrink-0"
               />
               <span className="text-xl font-black tracking-tight">
@@ -553,7 +590,7 @@ export default function Home() {
             </div>
 
             <p className="text-white/60 text-sm max-w-sm leading-relaxed">
-              L'association des lycéens et des étudiants. MDLE, Lycée Polyvalent Jean Perrin, Marseille.
+              L’association des lycéens et des étudiants. MDLE, Lycée Polyvalent Jean Perrin, Marseille.
             </p>
 
             <div className="space-y-3 pt-2 text-sm">
@@ -607,9 +644,11 @@ export default function Home() {
 
           {/* Colonne Droite : Image bâtiment */}
           <div className="bg-[#FAFAF8] p-3 rounded-3xl border border-white/10 shadow-sm overflow-hidden flex items-center justify-center">
-            <img
+            <Image
               src="/plan-acces.jpg"
               alt="Bâtiment de la MDLE du Lycée Jean Perrin"
+              width={1200}
+              height={800}
               className="w-full h-auto max-h-[420px] object-contain rounded-2xl"
             />
           </div>

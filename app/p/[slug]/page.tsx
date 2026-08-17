@@ -1,14 +1,10 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
 import { Project, calculateSubmissionTotal } from '@/lib/projects'
 import { ArrowLeft, CheckCircle2, AlertCircle, ShoppingBag } from 'lucide-react'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export default function DynamicProjectReservationPage() {
   const routeParams = useParams()
@@ -37,34 +33,6 @@ export default function DynamicProjectReservationPage() {
   const [submitted, setSubmitted] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
-  useEffect(() => {
-    if (!slug) return
-
-    async function fetchProject() {
-      setPageLoading(true)
-      try {
-        const { data, error } = await supabase
-          .from('projects')
-          .select('*')
-          .eq('slug', slug)
-          .single()
-
-        if (!error && data) {
-          setProject(data)
-          initDefaultOptions(data)
-        } else {
-          setNotFound(true)
-        }
-      } catch {
-        setNotFound(true)
-      } finally {
-        setPageLoading(false)
-      }
-    }
-
-    fetchProject()
-  }, [slug])
-
   const initDefaultOptions = (proj: Project) => {
     const defaults: Record<string, string> = {}
     if (proj.form_config.options) {
@@ -76,6 +44,32 @@ export default function DynamicProjectReservationPage() {
     }
     setSelectedOptions(defaults)
   }
+
+  useEffect(() => {
+    if (!slug) return
+
+    async function fetchProject() {
+      setPageLoading(true)
+      setNotFound(false)
+      try {
+        const response = await fetch(`/api/projects/${encodeURIComponent(slug)}`)
+        if (!response.ok) {
+          setNotFound(true)
+          return
+        }
+
+        const { project: projectData } = await response.json() as { project: Project }
+        setProject(projectData)
+        initDefaultOptions(projectData)
+      } catch {
+        setNotFound(true)
+      } finally {
+        setPageLoading(false)
+      }
+    }
+
+    void fetchProject()
+  }, [slug])
 
   const handleOptionChange = (optionId: string, value: string) => {
     setSelectedOptions(prev => ({ ...prev, [optionId]: value }))
@@ -92,84 +86,32 @@ export default function DynamicProjectReservationPage() {
     setErrorMsg('')
 
     try {
-      // Insertion dans project_submissions
-      const submissionPayload = {
-        project_id: project.id > 0 ? project.id : null,
-        project_slug: project.slug,
-        buyer_firstname: buyerFirstname,
-        buyer_lastname: buyerLastname,
-        buyer_class: buyerClass,
-        receiver_firstname: config.has_receiver ? receiverFirstname : null,
-        receiver_lastname: config.has_receiver ? receiverLastname : null,
-        receiver_class: config.has_receiver ? receiverClass : null,
-        selected_options: selectedOptions,
-        quantity: config.allow_quantity ? quantity : 1,
-        is_anonymous: config.allow_anonymous ? isAnonymous : false,
-        message: (config.allow_message && hasMessage) ? message : null,
-        total_price: totalPrice,
-        is_paid: false,
-        is_delivered: false
-      }
+      const response = await fetch(`/api/projects/${encodeURIComponent(project.slug)}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          buyerFirstname,
+          buyerLastname,
+          buyerClass,
+          receiverFirstname,
+          receiverLastname,
+          receiverClass,
+          selectedOptions,
+          quantity,
+          isAnonymous,
+          hasMessage,
+          message,
+        }),
+      })
 
-      const { error } = await supabase.from('project_submissions').insert([submissionPayload])
-
-      if (error) {
-        // En cas de secours pour les roses si project_submissions n'existe pas encore en BDD
-        if (slug === 'roses' || slug === 'rose') {
-          const colorChoice = selectedOptions['color'] || 'Rouge'
-          const cleanColor = colorChoice.includes('Rose') ? 'Rose' : 'Rouge'
-          await supabase.from('rose_orders').insert([
-            {
-              buyer_firstname: buyerFirstname,
-              buyer_lastname: buyerLastname,
-              buyer_class: buyerClass,
-              receiver_firstname: receiverFirstname,
-              receiver_lastname: receiverLastname,
-              receiver_class: receiverClass,
-              color: cleanColor,
-              quantity,
-              is_anonymous: isAnonymous,
-              message: hasMessage ? message : null,
-              total_price: totalPrice,
-              is_paid: false,
-              is_delivered: false
-            }
-          ])
-        } else {
-          throw error
-        }
-      }
-
-      // Si le projet est "roses", on pousse aussi dans rose_orders pour garder la table historique synchronisée
-      if ((slug === 'roses' || slug === 'rose') && !error) {
-        const colorChoice = selectedOptions['color'] || 'Rouge'
-        const cleanColor = colorChoice.includes('Rose') ? 'Rose' : 'Rouge'
-        try {
-          await supabase.from('rose_orders').insert([
-            {
-              buyer_firstname: buyerFirstname,
-              buyer_lastname: buyerLastname,
-              buyer_class: buyerClass,
-              receiver_firstname: receiverFirstname,
-              receiver_lastname: receiverLastname,
-              receiver_class: receiverClass,
-              color: cleanColor,
-              quantity,
-              is_anonymous: isAnonymous,
-              message: hasMessage ? message : null,
-              total_price: totalPrice,
-              is_paid: false,
-              is_delivered: false
-            }
-          ])
-        } catch {
-          // Ignorer
-        }
+      const result = await response.json() as { error?: string }
+      if (!response.ok) {
+        throw new Error(result.error || 'Une erreur est survenue lors de la soumission. Réessaie.')
       }
 
       setSubmitted(true)
-    } catch (err: any) {
-      setErrorMsg(err?.message || 'Une erreur est survenue lors de la soumission. Réessayez.')
+    } catch (error: unknown) {
+      setErrorMsg(error instanceof Error ? error.message : 'Une erreur est survenue lors de la soumission. Réessaie.')
     } finally {
       setSubmitting(false)
     }
@@ -195,14 +137,14 @@ export default function DynamicProjectReservationPage() {
           </div>
           <h1 className="text-2xl font-black">Projet introuvable</h1>
           <p className="text-xs text-[#1B2A4A]/60">
-            L'opération ou le projet "<strong>{slug}</strong>" n'existe pas ou a été désactivé par la MDLE.
+            L’opération ou le projet <strong>« {slug} »</strong> n’existe pas ou a été désactivé par la MDLE.
           </p>
-          <a
+          <Link
             href="/"
             className="inline-flex items-center gap-2 bg-[#1B2A4A] text-white font-bold px-5 py-2.5 rounded-xl text-xs hover:bg-[#F26D5B] transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" /> Retour à l'accueil
-          </a>
+            <ArrowLeft className="w-4 h-4" /> Retour à l’accueil
+          </Link>
         </div>
       </div>
     )
@@ -217,12 +159,12 @@ export default function DynamicProjectReservationPage() {
           <p className="text-xs text-[#1B2A4A]/60">
             Les réservations pour <strong>{project.title}</strong> sont actuellement fermées.
           </p>
-          <a
+          <Link
             href="/"
             className="inline-flex items-center gap-2 bg-[#1B2A4A] text-white font-bold px-5 py-2.5 rounded-xl text-xs hover:bg-[#F26D5B] transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" /> Retour à l'accueil
-          </a>
+            <ArrowLeft className="w-4 h-4" /> Retour à l’accueil
+          </Link>
         </div>
       </div>
     )
@@ -268,12 +210,12 @@ export default function DynamicProjectReservationPage() {
             >
               Passer une autre commande
             </button>
-            <a
+            <Link
               href="/"
               className="w-full bg-white border border-[#1B2A4A]/10 text-[#1B2A4A] font-bold py-3 rounded-xl text-xs hover:bg-gray-50 transition-colors"
             >
-              Retour à l'accueil MDLE
-            </a>
+              Retour à l’accueil MDLE
+            </Link>
           </div>
         </div>
       </div>
@@ -286,12 +228,12 @@ export default function DynamicProjectReservationPage() {
         
         {/* Header avec lien retour */}
         <div className="flex items-center justify-between">
-          <a
+          <Link
             href="/"
             className="inline-flex items-center gap-2 text-xs font-bold text-[#1B2A4A]/60 hover:text-[#F26D5B] transition-colors"
           >
             <ArrowLeft className="w-4 h-4" /> Accueil MDLE
-          </a>
+          </Link>
           <span className="text-xs font-bold uppercase tracking-wider text-[#F26D5B] bg-[#F26D5B]/10 px-3 py-1 rounded-full">
             {project.badge_tag || 'MDLE Jean Perrin'}
           </span>

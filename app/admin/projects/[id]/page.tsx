@@ -1,14 +1,9 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
 import { Project, ProjectSubmission } from '@/lib/projects'
 import { ArrowLeft, CheckCircle, Clock, Trash2, Search, Download, ExternalLink, RefreshCw } from 'lucide-react'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export default function ProjectSubmissionsAdminPage() {
   const routeParams = useParams()
@@ -19,117 +14,71 @@ export default function ProjectSubmissionsAdminPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
-  useEffect(() => {
-    if (projectId) {
-      fetchProjectAndSubmissions()
-    }
-  }, [projectId])
-
-  const fetchProjectAndSubmissions = async () => {
+  const fetchProjectAndSubmissions = useCallback(async () => {
     setLoading(true)
     try {
-      // 1. Récupération du projet
-      const { data: projData } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('id', projectId)
-        .single()
-
-      setProject(projData)
-
-      if (projData) {
-        // 2. Récupération des soumissions depuis project_submissions
-        const { data: subsData } = await supabase
-          .from('project_submissions')
-          .select('*')
-          .or(`project_id.eq.${projData.id},project_slug.eq.${projData.slug}`)
-          .order('id', { ascending: false })
-
-        let list: ProjectSubmission[] = subsData || []
-
-        // Rétrocompatibilité : Si c'est les roses, fusionner ou utiliser les données de rose_orders
-        if (projData.slug === 'roses') {
-          const { data: roseOrdersData } = await supabase
-            .from('rose_orders')
-            .select('*')
-            .order('id', { ascending: false })
-
-          if (roseOrdersData && roseOrdersData.length > 0) {
-            // Convertir rose_orders au format ProjectSubmission s'ils ne sont pas déjà dans list
-            const legacyConverted: ProjectSubmission[] = roseOrdersData.map(r => ({
-              id: r.id + 10000, // décalage d'ID visuel pour distinguer
-              project_id: projData.id,
-              project_slug: 'roses',
-              buyer_firstname: r.buyer_firstname,
-              buyer_lastname: r.buyer_lastname,
-              buyer_class: r.buyer_class,
-              receiver_firstname: r.receiver_firstname,
-              receiver_lastname: r.receiver_lastname,
-              receiver_class: r.receiver_class,
-              selected_options: { color: `Rose ${r.color}` },
-              quantity: r.quantity,
-              is_anonymous: r.is_anonymous,
-              message: r.message,
-              total_price: r.total_price,
-              is_paid: r.is_paid,
-              is_delivered: r.is_delivered,
-              created_at: r.created_at
-            }))
-
-            // Fusionner en évitant les doublons stricts si déjà ré-insérés
-            if (list.length === 0) {
-              list = legacyConverted
-            }
-          }
-        }
-
-        setSubmissions(list)
+      const response = await fetch(`/api/admin/projects/${encodeURIComponent(projectId)}`, { cache: 'no-store' })
+      if (!response.ok) {
+        throw new Error('Chargement impossible')
       }
+
+      const data = await response.json() as { project: Project; submissions: ProjectSubmission[] }
+      setProject(data.project)
+      setSubmissions(data.submissions)
     } catch {
-      // Ignorer
+      setProject(null)
+      setSubmissions([])
     } finally {
       setLoading(false)
     }
+  }, [projectId])
+
+  useEffect(() => {
+    if (!projectId) return
+    const timer = window.setTimeout(() => {
+      void fetchProjectAndSubmissions()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [projectId, fetchProjectAndSubmissions])
+
+  const updateSubmission = async (id: number, changes: { is_paid?: boolean; is_delivered?: boolean }) => {
+    const response = await fetch(`/api/admin/projects/${encodeURIComponent(projectId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, legacy: id > 10000, ...changes }),
+    })
+    if (!response.ok) {
+      throw new Error('Mise à jour impossible')
+    }
+    await fetchProjectAndSubmissions()
   }
 
   const togglePaid = async (id: number, currentStatus: boolean) => {
-    await supabase.from('project_submissions').update({ is_paid: !currentStatus }).eq('id', id)
-    if (project?.slug === 'roses') {
-      const legacyId = id > 10000 ? id - 10000 : id
-      try {
-        await supabase.from('rose_orders').update({ is_paid: !currentStatus }).eq('id', legacyId)
-      } catch {
-        // Ignorer si la table n'existe pas
-      }
+    try {
+      await updateSubmission(id, { is_paid: !currentStatus })
+    } catch {
+      alert('Impossible de mettre à jour le paiement.')
     }
-    fetchProjectAndSubmissions()
   }
 
   const toggleDelivered = async (id: number, currentStatus: boolean) => {
-    await supabase.from('project_submissions').update({ is_delivered: !currentStatus }).eq('id', id)
-    if (project?.slug === 'roses') {
-      const legacyId = id > 10000 ? id - 10000 : id
-      try {
-        await supabase.from('rose_orders').update({ is_delivered: !currentStatus }).eq('id', legacyId)
-      } catch {
-        // Ignorer si la table n'existe pas
-      }
+    try {
+      await updateSubmission(id, { is_delivered: !currentStatus })
+    } catch {
+      alert('Impossible de mettre à jour la remise.')
     }
-    fetchProjectAndSubmissions()
   }
 
   const handleDelete = async (id: number) => {
-    if (confirm('Supprimer cette réservation ?')) {
-      await supabase.from('project_submissions').delete().eq('id', id)
-      if (project?.slug === 'roses') {
-        const legacyId = id > 10000 ? id - 10000 : id
-        try {
-          await supabase.from('rose_orders').delete().eq('id', legacyId)
-        } catch {
-          // Ignorer si la table n'existe pas
-        }
-      }
-      fetchProjectAndSubmissions()
+    if (!confirm('Supprimer cette réservation ?')) return
+    try {
+      const response = await fetch(`/api/admin/projects/${encodeURIComponent(projectId)}?id=${id}&legacy=${id > 10000}`, {
+        method: 'DELETE',
+      })
+      if (!response.ok) throw new Error('Suppression impossible')
+      await fetchProjectAndSubmissions()
+    } catch {
+      alert('Impossible de supprimer cette réservation.')
     }
   }
 
@@ -266,7 +215,7 @@ export default function ProjectSubmissionsAdminPage() {
             <p className="text-2xl font-black text-[#F26D5B] mt-1">{totalQuantity}</p>
           </div>
           <div className="bg-white p-5 rounded-2xl border border-[#1B2A4A]/10 shadow-sm">
-            <p className="text-[10px] font-bold text-[#1B2A4A]/60 uppercase">Chiffre d'affaires</p>
+            <p className="text-[10px] font-bold text-[#1B2A4A]/60 uppercase">Chiffre d’affaires</p>
             <p className="text-2xl font-black text-[#1B2A4A] mt-1">{totalRevenue.toFixed(2)} €</p>
           </div>
           <div className="bg-white p-5 rounded-2xl border border-[#1B2A4A]/10 shadow-sm">

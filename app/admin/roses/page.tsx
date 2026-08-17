@@ -1,49 +1,85 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import React, { useCallback, useEffect, useState } from 'react'
 import { ArrowLeft, CheckCircle, Clock, Trash2, Search } from 'lucide-react'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+type RoseOrder = {
+  id: number
+  buyer_firstname: string
+  buyer_lastname: string
+  buyer_class: string
+  receiver_firstname: string
+  receiver_lastname: string
+  receiver_class: string
+  color: string
+  quantity: number
+  is_anonymous: boolean
+  message: string | null
+  total_price: number
+  is_paid: boolean
+  is_delivered: boolean
+}
 
 export default function AdminRosesPage() {
-  const [orders, setOrders] = useState<any[]>([])
+  const [orders, setOrders] = useState<RoseOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
-  useEffect(() => {
-    fetchOrders()
+  const fetchOrders = useCallback(async () => {
+    setLoading(true)
+    try {
+      const response = await fetch('/api/admin/roses', { cache: 'no-store' })
+      if (!response.ok) throw new Error('Chargement impossible')
+      const data = await response.json() as { orders: RoseOrder[] }
+      setOrders(data.orders)
+    } catch {
+      setOrders([])
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  const fetchOrders = async () => {
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('rose_orders')
-      .select('*')
-      .order('id', { ascending: false })
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void fetchOrders()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [fetchOrders])
 
-    if (!error && data) {
-      setOrders(data)
-    }
-    setLoading(false)
+  const updateOrder = async (id: number, changes: { is_paid?: boolean; is_delivered?: boolean }) => {
+    const response = await fetch('/api/admin/roses', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...changes }),
+    })
+    if (!response.ok) throw new Error('Mise à jour impossible')
+    await fetchOrders()
   }
 
   const togglePaid = async (id: number, currentStatus: boolean) => {
-    await supabase.from('rose_orders').update({ is_paid: !currentStatus }).eq('id', id)
-    fetchOrders()
+    try {
+      await updateOrder(id, { is_paid: !currentStatus })
+    } catch {
+      alert('Impossible de mettre à jour le paiement.')
+    }
   }
 
   const toggleDelivered = async (id: number, currentStatus: boolean) => {
-    await supabase.from('rose_orders').update({ is_delivered: !currentStatus }).eq('id', id)
-    fetchOrders()
+    try {
+      await updateOrder(id, { is_delivered: !currentStatus })
+    } catch {
+      alert('Impossible de mettre à jour la livraison.')
+    }
   }
 
   const handleDelete = async (id: number) => {
-    if (confirm('Supprimer cette commande ?')) {
-      await supabase.from('rose_orders').delete().eq('id', id)
-      fetchOrders()
+    if (!confirm('Supprimer cette commande ?')) return
+    try {
+      const response = await fetch(`/api/admin/roses?id=${id}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error('Suppression impossible')
+      await fetchOrders()
+    } catch {
+      alert('Impossible de supprimer cette commande.')
     }
   }
 
@@ -96,7 +132,7 @@ export default function AdminRosesPage() {
             <p className="text-2xl font-black text-[#F26D5B] mt-1">{totalRoses} 🌹</p>
           </div>
           <div className="bg-white p-5 rounded-2xl border border-[#1B2A4A]/10 shadow-sm">
-            <p className="text-xs font-bold text-[#1B2A4A]/60 uppercase">Chiffre d'affaires</p>
+            <p className="text-xs font-bold text-[#1B2A4A]/60 uppercase">Chiffre d’affaires</p>
             <p className="text-2xl font-black text-[#1B2A4A] mt-1">{totalRevenue.toFixed(2)} €</p>
           </div>
           <div className="bg-white p-5 rounded-2xl border border-[#1B2A4A]/10 shadow-sm col-span-2 md:col-span-1">
