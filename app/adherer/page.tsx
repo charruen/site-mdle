@@ -2,9 +2,6 @@
 
 import { useState } from "react";
 
-// 🔧 À REMPLACER : colle ici ton vrai lien de paiement SumUp fixe à 10€
-const SUMUP_LINK = "https://pay.sumup.com/b2c/REMPLACE_MOI";
-
 export default function AdhererPage() {
     const [firstname, setFirstname] = useState("");
     const [lastname, setLastname] = useState("");
@@ -136,18 +133,10 @@ export default function AdhererPage() {
                             <div className="w-14 h-14 rounded-full bg-[#2E8B7A]/10 flex items-center justify-center mx-auto mb-4 text-2xl">
                                 ✅
                             </div>
-                            <h2 className="font-black text-lg mb-2">C’est presque fini !</h2>
-                            <p className="text-sm text-[#1B2A4A]/60 mb-6 leading-relaxed">
-                                Il ne reste plus qu’à régler ton adhésion de 10€ sur SumUp.
+                            <h2 className="font-black text-lg mb-2">Adhésion enregistrée</h2>
+                            <p className="text-sm text-[#1B2A4A]/60 leading-relaxed">
+                                Merci ! Ton inscription a bien été enregistrée. Pour finaliser ton adhésion, règle les 10€ directement auprès de l’équipe de la MDLE.
                             </p>
-                            <a
-                                href={SUMUP_LINK}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-block w-full bg-[#F26D5B] text-white font-bold text-sm py-3.5 rounded-full hover:bg-[#1B2A4A] transition-colors"
-                            >
-                                Payer 10€ sur SumUp
-                            </a>
                         </div>
                     )}
                 </div>
