@@ -76,7 +76,7 @@ export default function DynamicProjectReservationPage() {
   }
 
   const config = project?.form_config || {}
-  const totalPrice = calculateSubmissionTotal(config, selectedOptions, quantity, hasMessage)
+  const totalPrice = calculateSubmissionTotal(config, selectedOptions, quantity)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -333,7 +333,7 @@ export default function DynamicProjectReservationPage() {
 
           {/* Section Options & Produits */}
           <div className="space-y-4">
-            <h3 className="text-sm font-bold text-[#1B2A4A]">🎨 Choix des options</h3>
+            <h3 className="text-sm font-bold text-[#1B2A4A]">🎟️ Choisis tes offres</h3>
 
             {config.options && config.options.map(opt => (
               <div key={opt.id} className="space-y-1">
@@ -343,9 +343,9 @@ export default function DynamicProjectReservationPage() {
                   onChange={(e) => handleOptionChange(opt.id, e.target.value)}
                   className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm font-semibold text-[#1B2A4A]"
                 >
-                  {opt.choices.map((c, i) => (
-                    <option key={i} value={c.name}>
-                      {c.name}
+                  {opt.choices.map((choice, index) => (
+                    <option key={index} value={choice.name}>
+                      {choice.name} — {choice.price.toFixed(2).replace('.', ',')} €
                     </option>
                   ))}
                 </select>

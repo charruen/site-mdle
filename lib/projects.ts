@@ -21,7 +21,6 @@ export interface ProjectFormConfig {
   anonymous_label?: string
   allow_message?: boolean
   message_label?: string
-  message_price?: number
   confirmation_text?: string
 }
 
@@ -75,8 +74,8 @@ export const PRESET_TEMPLATES = [
           id: 'variant',
           label: 'Variante / Couleur',
           choices: [
-            { name: '🔴 Rouge (2,00€)', price: 2.00 },
-            { name: '🩷 Rose (2,00€)', price: 2.00 }
+            { name: '🔴 Rouge', price: 2.00 },
+            { name: '🩷 Rose', price: 2.00 }
           ]
         }
       ],
@@ -86,7 +85,6 @@ export const PRESET_TEMPLATES = [
       anonymous_label: '🤫 Envoi Anonyme (nom masque pour le receveur)',
       allow_message: true,
       message_label: '💌 Ajouter un mot personnalisé',
-      message_price: 0.50,
       confirmation_text: 'Merci ! Rend-toi au foyer MDLE pour effectuer ton reglement et valider ta commande.'
     }
   },
@@ -104,10 +102,10 @@ export const PRESET_TEMPLATES = [
           id: 'size',
           label: 'Choix de la taille',
           choices: [
-            { name: 'Taille S (25,00€)', price: 25.00 },
-            { name: 'Taille M (25,00€)', price: 25.00 },
-            { name: 'Taille L (25,00€)', price: 25.00 },
-            { name: 'Taille XL (25,00€)', price: 25.00 }
+            { name: 'Taille S', price: 25.00 },
+            { name: 'Taille M', price: 25.00 },
+            { name: 'Taille L', price: 25.00 },
+            { name: 'Taille XL', price: 25.00 }
           ]
         }
       ],
@@ -132,8 +130,8 @@ export const PRESET_TEMPLATES = [
           id: 'ticket',
           label: 'Type d\'entrée',
           choices: [
-            { name: 'Entrée Classique (3,00€)', price: 3.00 },
-            { name: 'Entrée + Boisson (5,00€)', price: 5.00 }
+            { name: 'Entrée Classique', price: 3.00 },
+            { name: 'Entrée + Boisson', price: 5.00 }
           ]
         }
       ],
@@ -167,8 +165,7 @@ export const PRESET_TEMPLATES = [
 export function calculateSubmissionTotal(
   config: ProjectFormConfig,
   selectedOptions: Record<string, string>,
-  quantity: number,
-  hasMessage: boolean
+  quantity: number
 ): number {
   let unitPrice = config.base_price || 0
 
@@ -185,7 +182,6 @@ export function calculateSubmissionTotal(
   }
 
   const baseTotal = unitPrice * (quantity > 0 ? quantity : 1)
-  const extraMessage = hasMessage && config.allow_message ? (config.message_price || 0) : 0
 
-  return baseTotal + extraMessage
+  return baseTotal
 }

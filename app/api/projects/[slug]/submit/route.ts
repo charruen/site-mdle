@@ -88,7 +88,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       allowedOptions[option.id] = validChoice.name
     }
 
-    const totalPrice = calculateSubmissionTotal(config, allowedOptions, quantity, hasMessage)
+    const totalPrice = calculateSubmissionTotal(config, allowedOptions, quantity)
     const { error: insertError } = await supabase.from('project_submissions').insert({
       project_id: project.id,
       project_slug: project.slug,

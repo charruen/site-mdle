@@ -320,12 +320,9 @@ export default function AdminPage() {
   const handleAddOptionGroup = () => {
     const newOpts = [...(customFormConfig.options || [])]
     newOpts.push({
-      id: `opt_${Date.now()}`,
-      label: 'Choix / Tarifs',
-      choices: [
-        { name: 'Entrée Standard (5,00€)', price: 5.00 },
-        { name: 'Entrée + Boisson (7,00€)', price: 7.00 }
-      ]
+      id: `offer_${Date.now()}`,
+      label: 'Offres disponibles',
+      choices: [{ name: 'Nouvelle offre', price: 0 }]
     })
     setCustomFormConfig({ ...customFormConfig, options: newOpts })
   }
@@ -339,7 +336,7 @@ export default function AdminPage() {
   const handleAddChoice = (optIdx: number) => {
     const newOpts = [...(customFormConfig.options || [])]
     if (!newOpts[optIdx]) return
-    newOpts[optIdx].choices.push({ name: 'Nouvelle option (5,00€)', price: 5.00 })
+    newOpts[optIdx].choices.push({ name: 'Nouvelle offre', price: 0 })
     setCustomFormConfig({ ...customFormConfig, options: newOpts })
   }
 
@@ -817,19 +814,19 @@ export default function AdminPage() {
                 <div className="space-y-3 pt-2 bg-[#FAFAF8] p-4 rounded-2xl border border-[#1B2A4A]/10">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-[#1B2A4A] flex items-center gap-1.5">
-                      <DollarSign className="w-4 h-4 text-[#F26D5B]" /> Tarifs, Types d’Entrée & Options de Paiement
+                      <DollarSign className="w-4 h-4 text-[#F26D5B]" /> Offres et tarifs personnalisés
                     </span>
                     <button
                       type="button"
                       onClick={handleAddOptionGroup}
                       className="text-[11px] font-bold text-white bg-[#1B2A4A] hover:bg-[#F26D5B] px-3 py-1.5 rounded-lg transition"
                     >
-                      + Ajouter un groupe d’options
+                      + Ajouter une catégorie d’offres
                     </button>
                   </div>
 
                   {(!customFormConfig.options || customFormConfig.options.length === 0) ? (
-                    <p className="text-xs text-[#1B2A4A]/50 italic">Aucun choix de tarif défini. Cliquez ci-dessus pour ajouter vos prix/entrées.</p>
+                    <p className="text-xs text-[#1B2A4A]/50 italic">Aucune offre définie. Ajoute une catégorie, puis renseigne librement le libellé et le prix de chaque offre.</p>
                   ) : (
                     <div className="space-y-4">
                       {customFormConfig.options.map((optGroup, optIdx) => (
@@ -844,7 +841,7 @@ export default function AdminPage() {
                                 setCustomFormConfig({ ...customFormConfig, options: newOpts })
                               }}
                               className="text-xs font-bold bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-lg p-2 flex-1"
-                              placeholder="Nom du groupe (ex: Type d'entrée, Couleur...)"
+                              placeholder="Nom de la catégorie (ex: Billets, Boissons...)"
                             />
                             <button
                               type="button"
@@ -858,21 +855,22 @@ export default function AdminPage() {
 
                           {/* Liste des choix et tarifs */}
                           <div className="space-y-2 pl-2">
-                            <p className="text-[10px] font-bold text-[#1B2A4A]/50 uppercase">Choix & Prix unitaires :</p>
+                            <p className="text-[10px] font-bold text-[#1B2A4A]/50 uppercase">Offres et prix unitaires :</p>
                             {optGroup.choices.map((choice, choiceIdx) => (
                               <div key={choiceIdx} className="flex items-center gap-2">
                                 <input
                                   type="text"
                                   value={choice.name}
                                   onChange={e => handleUpdateChoice(optIdx, choiceIdx, 'name', e.target.value)}
-                                  placeholder="Nom de l'option (ex: Entrée Classique (5,00€))"
+                                  placeholder="Libellé de l’offre (ex: Boisson sans alcool)"
                                   className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-lg p-2 text-xs font-semibold flex-1"
                                 />
                                 <div className="w-28 flex items-center gap-1 bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-lg px-2 py-1.5">
                                   <span className="text-xs text-[#1B2A4A]/60">€</span>
                                   <input
                                     type="number"
-                                    step="0.50"
+                                    min="0"
+                                    step="0.01"
                                     value={choice.price}
                                     onChange={e => handleUpdateChoice(optIdx, choiceIdx, 'price', e.target.value)}
                                     className="w-full bg-transparent text-xs font-bold text-right focus:outline-none"
@@ -892,7 +890,7 @@ export default function AdminPage() {
                               onClick={() => handleAddChoice(optIdx)}
                               className="text-[10px] font-bold text-[#F26D5B] hover:underline mt-1 inline-block"
                             >
-                              + Ajouter une option de paiement / choix
+                              + Ajouter une offre
                             </button>
                           </div>
                         </div>
@@ -943,7 +941,7 @@ export default function AdminPage() {
                         onChange={e => setCustomFormConfig({ ...customFormConfig, allow_message: e.target.checked })}
                         className="accent-[#F26D5B]"
                       />
-                      <span>Option Mot Doux (+0.50€)</span>
+                      <span>Ajouter un message personnalisé</span>
                     </label>
                   </div>
                 </div>
