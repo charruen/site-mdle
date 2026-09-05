@@ -24,13 +24,21 @@ const MARQUEE_WORDS = [
   "REJOINS-NOUS",
 ];
 
-const BUREAU_MEMBERS = [
+const DEFAULT_BUREAU: { role: string; name: string; emoji: string }[] = [
   { role: "Président", name: "Thomas", emoji: "👑" },
   { role: "Vice-Présidente 1", name: "Marie", emoji: "⚡" },
   { role: "Vice-Présidente 2", name: "Lisa", emoji: "⚡" },
   { role: "Trésorier", name: "Nathan", emoji: "💰" },
   { role: "Trésorier Adjoint", name: "Esteban", emoji: "💰" },
   { role: "Secrétaire", name: "À définir", emoji: "📝" },
+];
+
+const DEFAULT_HOURS: { day: string; hours: string }[] = [
+  { day: "Lundi", hours: "9h - 17h" },
+  { day: "Mardi", hours: "9h - 17h" },
+  { day: "Mercredi", hours: "9h - 12h" },
+  { day: "Jeudi", hours: "9h - 17h" },
+  { day: "Vendredi", hours: "9h - 15h" },
 ];
 
 const CATEGORIES = [
@@ -69,6 +77,13 @@ type ActiveProject = {
   badge_tag: string | null;
 };
 
+type SiteSettings = {
+  marquee_text: string;
+  marquee_active: boolean;
+  opening_hours: { day: string; hours: string }[];
+  bureau_members: { role: string; name: string; emoji: string }[];
+};
+
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -76,6 +91,12 @@ export default function Home() {
   const [activeProjects, setActiveProjects] = useState<ActiveProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>("TOUT");
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>({
+    marquee_text: '',
+    marquee_active: false,
+    opening_hours: DEFAULT_HOURS,
+    bureau_members: DEFAULT_BUREAU,
+  });
 
   useEffect(() => {
     async function fetchData() {
@@ -116,6 +137,18 @@ export default function Home() {
 
       if (menuData) setMenuItems(menuData);
       if (agendaData) setAgendaEvents(agendaData);
+
+      // Récupération des paramètres du site
+      try {
+        const { data: settingsData } = await supabase
+          .from('site_settings')
+          .select('*')
+          .eq('id', 1)
+          .single();
+        if (settingsData) {
+          setSiteSettings(settingsData as SiteSettings);
+        }
+      } catch { /* on garde les valeurs par défaut */ }
 
       setLoading(false);
     }
@@ -288,28 +321,34 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Bandeau défilant à raccord continu */}
-      <div className="bg-[#1B2A4A] text-white py-3 overflow-hidden" aria-label="Actualités de la MDLE">
-        <div className="marquee-track flex w-max whitespace-nowrap">
-          {[0, 1].map((groupIndex) => (
-            <div key={groupIndex} className="flex shrink-0" aria-hidden={groupIndex === 1}>
-              {[0, 1].map((repeatIndex) => (
-                <React.Fragment key={repeatIndex}>
-                  {MARQUEE_WORDS.map((word, wordIndex) => (
-                    <span
-                      key={`${groupIndex}-${repeatIndex}-${wordIndex}`}
-                      className="mx-6 inline-flex items-center gap-6 text-sm font-bold uppercase tracking-widest"
-                    >
-                      {word}
-                      <span className="text-[#F2A63C]">✦</span>
-                    </span>
-                  ))}
-                </React.Fragment>
-              ))}
-            </div>
-          ))}
+      {/* Bandeau défilant — statique si pas d'annonce, annonce si activé */}
+      {siteSettings.marquee_active && siteSettings.marquee_text ? (
+        <div className="bg-[#F26D5B] text-white py-3 px-5 text-center text-sm font-bold" role="alert">
+          {siteSettings.marquee_text}
         </div>
-      </div>
+      ) : (
+        <div className="bg-[#1B2A4A] text-white py-3 overflow-hidden" aria-label="Actualités de la MDLE">
+          <div className="marquee-track flex w-max whitespace-nowrap">
+            {[0, 1].map((groupIndex) => (
+              <div key={groupIndex} className="flex shrink-0" aria-hidden={groupIndex === 1}>
+                {[0, 1].map((repeatIndex) => (
+                  <React.Fragment key={repeatIndex}>
+                    {MARQUEE_WORDS.map((word, wordIndex) => (
+                      <span
+                        key={`${groupIndex}-${repeatIndex}-${wordIndex}`}
+                        className="mx-6 inline-flex items-center gap-6 text-sm font-bold uppercase tracking-widest"
+                      >
+                        {word}
+                        <span className="text-[#F2A63C]">✦</span>
+                      </span>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Infos pratiques & Équipe / Bureau */}
       <section id="infos" className="max-w-6xl mx-auto px-5 py-20 md:py-28">
@@ -334,12 +373,10 @@ export default function Home() {
                   🕒
                 </span>
                 <div>
-                  <p className="font-bold">Horaires d’ouverture</p>
-                  <p className="text-[#1B2A4A]/60">Lundi 9h - 17h</p>
-                  <p className="text-[#1B2A4A]/60">Mardi 9h - 17h</p>
-                  <p className="text-[#1B2A4A]/60">Mercredi 9h - 12h</p>
-                  <p className="text-[#1B2A4A]/60">Jeudi 9h - 17h</p>
-                  <p className="text-[#1B2A4A]/60">Vendredi 9h - 15h</p>
+                  <p className="font-bold">Horaires d'ouverture</p>
+                  {siteSettings.opening_hours.map((h, i) => (
+                    <p key={i} className="text-[#1B2A4A]/60">{h.day} {h.hours}</p>
+                  ))}
                 </div>
               </li>
               <li className="flex items-start gap-3">
@@ -360,9 +397,9 @@ export default function Home() {
               <span>👥</span> Les Élus de la MDLE
             </h3>
             <div className="grid sm:grid-cols-2 gap-4">
-              {BUREAU_MEMBERS.map((member) => (
+              {siteSettings.bureau_members.map((member, i) => (
                 <div
-                  key={member.role}
+                  key={i}
                   className="bg-[#FAFAF8] border border-[#1B2A4A]/5 rounded-2xl p-4 flex items-center gap-3"
                 >
                   <span className="text-2xl">{member.emoji}</span>

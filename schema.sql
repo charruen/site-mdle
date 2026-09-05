@@ -89,6 +89,29 @@ CREATE TABLE IF NOT EXISTS public.adherents (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS public.site_settings (
+  id BIGINT PRIMARY KEY DEFAULT 1,
+  marquee_text TEXT DEFAULT '⚠️ Bienvenue sur le site de la MDLE !',
+  marquee_active BOOLEAN DEFAULT false,
+  opening_hours JSONB DEFAULT '[
+    {"day": "Lundi", "hours": "9h - 17h"},
+    {"day": "Mardi", "hours": "9h - 17h"},
+    {"day": "Mercredi", "hours": "9h - 12h"},
+    {"day": "Jeudi", "hours": "9h - 17h"},
+    {"day": "Vendredi", "hours": "9h - 15h"}
+  ]'::jsonb,
+  bureau_members JSONB DEFAULT '[
+    {"role": "Président", "name": "Thomas", "emoji": "👑"},
+    {"role": "Vice-Présidente 1", "name": "Marie", "emoji": "⚡"},
+    {"role": "Vice-Présidente 2", "name": "Lisa", "emoji": "⚡"},
+    {"role": "Trésorier", "name": "Nathan", "emoji": "💰"},
+    {"role": "Trésorier Adjoint", "name": "Esteban", "emoji": "💰"},
+    {"role": "Secrétaire", "name": "À définir", "emoji": "📝"}
+  ]'::jsonb,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT site_settings_single_row CHECK (id = 1)
+);
+
 CREATE INDEX IF NOT EXISTS idx_projects_slug ON public.projects(slug);
 CREATE INDEX IF NOT EXISTS idx_submissions_project_id ON public.project_submissions(project_id);
 CREATE INDEX IF NOT EXISTS idx_submissions_project_slug ON public.project_submissions(project_slug);
@@ -99,6 +122,7 @@ ALTER TABLE public.rose_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_submissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.adherents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
 
 DO $$
 DECLARE
@@ -114,7 +138,8 @@ BEGIN
         'projects',
         'project_submissions',
         'rose_orders',
-        'adherents'
+        'adherents',
+        'site_settings'
       )
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', policy_record.policyname, policy_record.tablename);
@@ -128,8 +153,9 @@ REVOKE INSERT, UPDATE, DELETE ON public.projects FROM anon, authenticated;
 REVOKE SELECT, INSERT, UPDATE, DELETE ON public.project_submissions FROM anon, authenticated;
 REVOKE SELECT, INSERT, UPDATE, DELETE ON public.rose_orders FROM anon, authenticated;
 REVOKE SELECT, INSERT, UPDATE, DELETE ON public.adherents FROM anon, authenticated;
+REVOKE INSERT, UPDATE, DELETE ON public.site_settings FROM anon, authenticated;
 
-GRANT SELECT ON public.menu_items, public.events, public.projects TO anon, authenticated;
+GRANT SELECT ON public.menu_items, public.events, public.projects, public.site_settings TO anon, authenticated;
 
 CREATE POLICY "Lecture publique menu"
   ON public.menu_items
@@ -148,3 +174,9 @@ CREATE POLICY "Lecture publique des projets actifs"
   FOR SELECT
   TO anon, authenticated
   USING (is_active = true);
+
+CREATE POLICY "Lecture publique des settings"
+  ON public.site_settings
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
