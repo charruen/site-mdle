@@ -744,9 +744,9 @@ END:VCALENDAR`;
               <a href="https://www.instagram.com/mdle.perrin" target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-white/70 hover:text-[#F26D5B] flex items-center gap-1.5 bg-white/5 px-3 py-2 rounded-xl">
                 📸 Instagram
               </a>
-              <a href="https://www.tiktok.com/@mdle.perrin" target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-white/70 hover:text-[#F26D5B] flex items-center gap-1.5 bg-white/5 px-3 py-2 rounded-xl">
+              {/* <a href="https://www.tiktok.com/@mdle.perrin" target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-white/70 hover:text-[#F26D5B] flex items-center gap-1.5 bg-white/5 px-3 py-2 rounded-xl">
                 🎵 TikTok
-              </a>
+              </a> */}
             </div>
           </div>
 
