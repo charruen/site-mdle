@@ -124,9 +124,17 @@ export default function Home() {
   }, []);
 
   // Filtrage des produits selon la catégorie sélectionnée
-  const filteredMenuItems = selectedCategory === "TOUT"
-    ? menuItems
-    : menuItems.filter((item) => item.category === selectedCategory);
+  const filteredMenuItems = menuItems
+    .filter((item) => {
+      if (selectedCategory === "TOUT") {
+        return item.is_available;
+      }
+      return item.category === selectedCategory;
+    })
+    .sort((a, b) => {
+      if (a.is_available === b.is_available) return 0;
+      return a.is_available ? -1 : 1;
+    });
 
   return (
     <div className="min-h-screen bg-[#FAFAF8] text-[#1B2A4A] font-sans antialiased">
