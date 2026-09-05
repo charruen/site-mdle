@@ -387,7 +387,7 @@ export default function AdminPage() {
                 <input type="text" placeholder="Nom de l'article" value={newTitle} onChange={e => setNewTitle(e.target.value)} className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" required />
                 <div className="grid grid-cols-2 gap-3">
                   <select value={newCategory} onChange={e => setNewCategory(e.target.value)} className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm font-semibold">
-                    {['Boissons', 'Snacks sucrés', 'Snacks salés', 'Formules', '✨ Ventes Saisonnières'].map(c => <option key={c}>{c}</option>)}
+                    {['Boissons', 'Snacks sucrés', 'Snacks salés', 'Formules', 'Ventes Saisonnières'].map(c => <option key={c}>{c}</option>)}
                   </select>
                   <input type="text" placeholder="Prix (ex: 1,50€)" value={newPrice} onChange={e => setNewPrice(e.target.value)} className="bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm" required />
                 </div>
