@@ -1,3 +1,1 @@
-git add .
-git commit -m "Update [date] - [time]"
-git push origin main
+git add . ; git commit -m "Update $(Get-Date -Format 'dd-MM-yyyy - HH:mm:ss')" ; git push origin main
