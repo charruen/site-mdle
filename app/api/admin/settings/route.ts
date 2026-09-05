@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
-import { cookies } from 'next/headers'
+import { isAdminAuthenticated } from '@/lib/adminAuth'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,11 +40,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const c = await cookies()
-  const token = c.get('admin_token')?.value
-  const ADMIN_PASS = process.env.ADMIN_PASSWORD
-
-  if (!ADMIN_PASS || token !== ADMIN_PASS) {
+  if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
   }
 
