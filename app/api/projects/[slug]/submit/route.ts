@@ -20,6 +20,8 @@ type SubmissionInput = {
   isAnonymous?: unknown
   hasMessage?: unknown
   message?: unknown
+  paymentMethod?: unknown
+  paymentName?: unknown
 }
 
 function cleanText(value: unknown, maxLength: number) {
@@ -69,6 +71,12 @@ export async function POST(request: Request, { params }: RouteContext) {
     const quantityInput = Number(input.quantity)
     const quantity = config.allow_quantity ? Math.min(Math.max(Number.isInteger(quantityInput) ? quantityInput : 1, 1), 50) : 1
     const hasMessage = Boolean(config.allow_message && input.hasMessage === true && message.length > 0)
+    const paymentMethod = input.paymentMethod === 'CARTE' ? 'CARTE' : 'ESPECES'
+    const paymentName = input.paymentMethod === 'CARTE' ? cleanText(input.paymentName, 100) : null
+
+    if (paymentMethod === 'CARTE' && !paymentName) {
+      return NextResponse.json({ error: 'Le nom sur la carte est requis pour un paiement par carte.' }, { status: 400 })
+    }
 
     if (!buyerFirstname || !buyerLastname || !buyerClass) {
       return NextResponse.json({ error: 'Prénom, nom et classe sont obligatoires.' }, { status: 400 })
@@ -103,6 +111,8 @@ export async function POST(request: Request, { params }: RouteContext) {
       is_anonymous: config.allow_anonymous && input.isAnonymous === true,
       message: hasMessage ? message : null,
       total_price: totalPrice,
+      payment_method: paymentMethod,
+      payment_name: paymentName,
       is_paid: false,
       is_delivered: false,
     })

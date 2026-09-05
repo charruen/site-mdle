@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS public.rose_orders (
   is_anonymous BOOLEAN DEFAULT false,
   message TEXT,
   total_price NUMERIC(10, 2) NOT NULL,
+  payment_method TEXT DEFAULT 'ESPECES',
+  payment_name TEXT,
   is_paid BOOLEAN DEFAULT false,
   is_delivered BOOLEAN DEFAULT false
 );
@@ -70,6 +72,8 @@ CREATE TABLE IF NOT EXISTS public.project_submissions (
   is_anonymous BOOLEAN DEFAULT FALSE,
   message TEXT,
   total_price NUMERIC(10, 2) DEFAULT 0.00,
+  payment_method TEXT DEFAULT 'ESPECES',
+  payment_name TEXT,
   is_paid BOOLEAN DEFAULT FALSE,
   is_delivered BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
@@ -80,6 +84,8 @@ CREATE TABLE IF NOT EXISTS public.adherents (
   firstname TEXT NOT NULL,
   lastname TEXT NOT NULL,
   class TEXT NOT NULL,
+  payment_method TEXT DEFAULT 'ESPECES',
+  payment_name TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

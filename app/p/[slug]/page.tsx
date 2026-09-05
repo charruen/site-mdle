@@ -29,6 +29,9 @@ export default function DynamicProjectReservationPage() {
   const [hasMessage, setHasMessage] = useState(false)
   const [message, setMessage] = useState('')
 
+  const [paymentMethod, setPaymentMethod] = useState<'ESPECES' | 'CARTE'>('ESPECES')
+  const [paymentName, setPaymentName] = useState('')
+
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
@@ -101,6 +104,8 @@ export default function DynamicProjectReservationPage() {
           isAnonymous,
           hasMessage,
           message,
+          paymentMethod,
+          paymentName,
         }),
       })
 
@@ -205,6 +210,8 @@ export default function DynamicProjectReservationPage() {
                 setHasMessage(false)
                 setIsAnonymous(false)
                 setQuantity(1)
+                setPaymentMethod('ESPECES')
+                setPaymentName('')
               }}
               className="w-full bg-[#1B2A4A] text-white font-bold py-3 rounded-xl text-xs hover:bg-[#F26D5B] transition-colors shadow-md"
             >
@@ -409,6 +416,63 @@ export default function DynamicProjectReservationPage() {
                     required={hasMessage}
                   />
                 )}
+              </div>
+            )}
+          </div>
+
+          <hr className="border-[#1B2A4A]/10" />
+
+          {/* Section Paiement */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-bold text-[#1B2A4A]">💳 Moyen de paiement</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <label className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${paymentMethod === 'ESPECES' ? 'border-[#F26D5B] bg-[#F26D5B]/5' : 'border-[#1B2A4A]/10 bg-[#FAFAF8] hover:border-[#1B2A4A]/30'}`}>
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value="ESPECES"
+                  checked={paymentMethod === 'ESPECES'}
+                  onChange={() => setPaymentMethod('ESPECES')}
+                  className="w-5 h-5 accent-[#F26D5B]"
+                />
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-[#1B2A4A]">Espèces</span>
+                  <span className="text-xs text-[#1B2A4A]/60">Paiement au comptoir</span>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3 p-4 rounded-xl border-2 border-[#1B2A4A]/5 bg-gray-50 opacity-60 cursor-not-allowed">
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value="CARTE"
+                  disabled
+                  className="w-5 h-5"
+                />
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-[#1B2A4A]">Carte Bancaire <span className="ml-2 text-[10px] bg-[#1B2A4A] text-white px-2 py-0.5 rounded-full uppercase tracking-wider">Bientôt</span></span>
+                  <span className="text-xs text-[#1B2A4A]/60">Paiement en ligne via SumUp</span>
+                </div>
+              </label>
+            </div>
+
+            {paymentMethod === 'CARTE' && (
+              <div className="space-y-2 mt-4 animate-in fade-in slide-in-from-top-2">
+                <label className="block text-xs font-bold text-[#1B2A4A]/60">
+                  Nom présent sur la carte de paiement (requis pour validation)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: M JEAN DUPONT"
+                  value={paymentName}
+                  onChange={(e) => setPaymentName(e.target.value)}
+                  required={paymentMethod === 'CARTE'}
+                  className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#F26D5B]"
+                />
+                <p className="text-[10px] text-[#1B2A4A]/50">
+                  Cette information nous permet de faire le lien entre ta commande et le paiement SumUp.
+                </p>
               </div>
             )}
           </div>

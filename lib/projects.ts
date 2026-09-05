@@ -52,6 +52,8 @@ export interface ProjectSubmission {
   is_anonymous?: boolean
   message?: string | null
   total_price: number
+  payment_method?: string
+  payment_name?: string | null
   is_paid: boolean
   is_delivered: boolean
   created_at?: string
