@@ -7,17 +7,19 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   const supabase = getSupabaseAdmin()
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('site_settings')
     .select('*')
     .eq('id', 1)
     .single()
 
-  if (error) {
-    // Si la table est vide ou n'existe pas encore, on renvoie des valeurs par défaut
-    return NextResponse.json({
+  if (error || !data) {
+    const defaultSettings = {
+      id: 1,
       marquee_text: '⚠️ Bienvenue sur le site de la MDLE !',
       marquee_active: false,
+      promo_text: '',
+      promo_active: false,
       opening_hours: [
         { day: 'Lundi', hours: '9h - 16h' },
         { day: 'Mardi', hours: '9h - 16h' },
@@ -31,7 +33,23 @@ export async function GET() {
         { role: 'Vice-Présidente 2', name: 'Lisa', emoji: '⚡' },
         { role: 'Trésorier', name: 'Nathan', emoji: '💰' },
       ],
-    })
+      updated_at: new Date().toISOString(),
+    }
+
+    // Auto-enregistrement dans Supabase pour que la base contienne immédiatement la ligne
+    try {
+      const { data: createdData } = await supabase
+        .from('site_settings')
+        .upsert(defaultSettings)
+        .select()
+        .single()
+
+      if (createdData) return NextResponse.json(createdData)
+    } catch {
+      /* fallback si la table n'a pas encore été créée dans Supabase */
+    }
+
+    return NextResponse.json(defaultSettings)
   }
 
   return NextResponse.json(data)

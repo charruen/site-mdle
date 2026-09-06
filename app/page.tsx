@@ -75,11 +75,21 @@ type ActiveProject = {
   description: string | null;
   emoji: string | null;
   badge_tag: string | null;
+  form_config?: {
+    base_price?: number;
+    options?: {
+      id: string;
+      label: string;
+      choices: { name: string; price: number }[];
+    }[];
+  };
 };
 
 type SiteSettings = {
   marquee_text: string;
   marquee_active: boolean;
+  promo_text?: string;
+  promo_active?: boolean;
   opening_hours: { day: string; hours: string }[];
   bureau_members: { role: string; name: string; emoji: string }[];
 };
@@ -98,6 +108,8 @@ export default function Home() {
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({
     marquee_text: '',
     marquee_active: false,
+    promo_text: '',
+    promo_active: false,
     opening_hours: DEFAULT_HOURS,
     bureau_members: DEFAULT_BUREAU,
   });
@@ -130,7 +142,16 @@ export default function Home() {
 
       try {
         const { data: settingsData } = await supabase.from('site_settings').select('*').eq('id', 1).single();
-        if (settingsData) setSiteSettings(settingsData as SiteSettings);
+        if (settingsData) {
+          setSiteSettings({
+            marquee_text: settingsData.marquee_text || '',
+            marquee_active: Boolean(settingsData.marquee_active),
+            promo_text: settingsData.promo_text || '',
+            promo_active: Boolean(settingsData.promo_active),
+            opening_hours: Array.isArray(settingsData.opening_hours) ? settingsData.opening_hours : DEFAULT_HOURS,
+            bureau_members: Array.isArray(settingsData.bureau_members) ? settingsData.bureau_members : DEFAULT_BUREAU,
+          });
+        }
       } catch { /* valeurs par défaut */ }
 
       setLoading(false);
@@ -146,7 +167,8 @@ export default function Home() {
     const currentDay = days[now.getDay()];
     const currentHour = now.getHours() + now.getMinutes() / 60;
 
-    const todaySetting = siteSettings.opening_hours.find(h => h.day.toLowerCase() === currentDay.toLowerCase());
+    const hoursList = siteSettings.opening_hours || [];
+    const todaySetting = hoursList.find(h => h.day.toLowerCase() === currentDay.toLowerCase());
     if (!todaySetting) return false;
 
     // Exemple de parsing simple "9h - 17h"
@@ -166,6 +188,26 @@ export default function Home() {
     if (!createdAt) return false;
     const diffDays = (new Date().getTime() - new Date(createdAt).getTime()) / (1000 * 3600 * 24);
     return diffDays <= 7;
+  };
+
+  const getStartingPrice = (proj: ActiveProject): string | null => {
+    if (!proj.form_config) return null;
+    const base = proj.form_config.base_price || 0;
+    let minOption = Infinity;
+    if (proj.form_config.options) {
+      for (const opt of proj.form_config.options) {
+        if (opt.choices) {
+          for (const c of opt.choices) {
+            if (typeof c.price === 'number' && c.price < minOption) {
+              minOption = c.price;
+            }
+          }
+        }
+      }
+    }
+    const finalMin = (minOption !== Infinity ? minOption : 0) + base;
+    if (finalMin > 0) return `À partir de ${finalMin.toFixed(2).replace('.', ',')} €`;
+    return null;
   };
 
   const filteredMenuItems = menuItems
@@ -449,6 +491,11 @@ END:VCALENDAR`;
               <p className="text-white/50 text-sm mt-2 max-w-md">
                 Disponible à la vente pendant les horaires d’ouverture du foyer.
               </p>
+              {siteSettings.promo_active && siteSettings.promo_text && (
+                <div className="mt-3 inline-flex items-center gap-2 bg-[#F2A63C]/20 border border-[#F2A63C]/40 text-[#F2A63C] px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                  <span>✨</span> {siteSettings.promo_text}
+                </div>
+              )}
             </div>
 
             {/* Switch Mode Grille / Liste */}
@@ -642,41 +689,101 @@ END:VCALENDAR`;
             </h2>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {activeProjects.map((proj) => (
-              <div
-                key={proj.id}
-                className="bg-white border border-[#1B2A4A]/10 rounded-3xl p-6 shadow-sm hover:shadow-xl hover:border-[#F26D5B]/30 transition-all flex flex-col justify-between space-y-4 group"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="text-4xl">{proj.emoji || "🚀"}</span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#F26D5B] bg-[#F26D5B]/10 px-2.5 py-1 rounded-full">
-                      {proj.badge_tag || "Opération MDLE"}
-                    </span>
+          {/* Premier projet à la une (Bannière Hero) */}
+          {(() => {
+            const firstProj = activeProjects[0];
+            const otherProjs = activeProjects.slice(1);
+            const firstStartingPrice = getStartingPrice(firstProj);
+
+            return (
+              <div className="space-y-8">
+                <div className="bg-white border-2 border-[#F26D5B]/30 rounded-3xl p-6 md:p-10 shadow-lg hover:shadow-xl transition-all relative overflow-hidden group">
+                  <div className="pointer-events-none absolute -top-12 -right-12 w-48 h-48 rounded-full bg-[#F26D5B]/10 blur-xl" />
+
+                  <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="space-y-3 max-w-xl">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-5xl">{firstProj.emoji || "🚀"}</span>
+                        <span className="text-xs font-bold uppercase tracking-wider text-[#F26D5B] bg-[#F26D5B]/10 px-3 py-1 rounded-full border border-[#F26D5B]/20">
+                          🔥 À LA UNE — {firstProj.badge_tag || "Opération MDLE"}
+                        </span>
+                        {firstStartingPrice && (
+                          <span className="text-xs font-black text-[#1B2A4A] bg-[#F2A63C]/20 border border-[#F2A63C]/30 px-3 py-1 rounded-full">
+                            🏷️ {firstStartingPrice}
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="text-2xl md:text-3xl font-black text-[#1B2A4A] group-hover:text-[#F26D5B] transition-colors">
+                        {firstProj.title}
+                      </h3>
+
+                      {firstProj.description && (
+                        <p className="text-sm text-[#1B2A4A]/70 leading-relaxed whitespace-pre-line">
+                          {firstProj.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="shrink-0">
+                      <a
+                        href={`/p/${firstProj.slug}`}
+                        className="bg-[#1B2A4A] hover:bg-[#F26D5B] text-white font-bold py-4 px-8 rounded-2xl transition-all text-sm flex items-center justify-center gap-3 shadow-md hover:scale-105"
+                      >
+                        <span>Réserver / Commander</span>
+                        <span className="group-hover:translate-x-1 transition-transform">→</span>
+                      </a>
+                    </div>
                   </div>
-                  <h3 className="text-xl font-black text-[#1B2A4A] group-hover:text-[#F26D5B] transition-colors">
-                    {proj.title}
-                  </h3>
-                  {proj.description && (
-                    <p className="text-xs text-[#1B2A4A]/60 mt-2 line-clamp-3 leading-relaxed whitespace-pre-line">
-                      {proj.description}
-                    </p>
-                  )}
                 </div>
 
-                <div className="pt-4 border-t border-[#1B2A4A]/8">
-                  <a
-                    href={`/p/${proj.slug}`}
-                    className="w-full bg-[#1B2A4A] hover:bg-[#F26D5B] text-white font-bold py-3 px-4 rounded-2xl transition-colors text-xs flex items-center justify-center gap-2 shadow-sm"
-                  >
-                    <span>Réserver / Commander</span>
-                    <span className="group-hover:translate-x-1 transition-transform">→</span>
-                  </a>
-                </div>
+                {/* Autres projets en grille */}
+                {otherProjs.length > 0 && (
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {otherProjs.map((proj) => {
+                      const startingPrice = getStartingPrice(proj);
+                      return (
+                        <div
+                          key={proj.id}
+                          className="bg-white border border-[#1B2A4A]/10 rounded-3xl p-6 shadow-sm hover:shadow-xl hover:border-[#F26D5B]/30 transition-all flex flex-col justify-between space-y-4 group"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between gap-2 mb-3">
+                              <span className="text-4xl">{proj.emoji || "🚀"}</span>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-[#F26D5B] bg-[#F26D5B]/10 px-2.5 py-1 rounded-full">
+                                {proj.badge_tag || "Opération MDLE"}
+                              </span>
+                            </div>
+                            <h3 className="text-xl font-black text-[#1B2A4A] group-hover:text-[#F26D5B] transition-colors">
+                              {proj.title}
+                            </h3>
+                            {proj.description && (
+                              <p className="text-xs text-[#1B2A4A]/60 mt-2 line-clamp-3 leading-relaxed whitespace-pre-line">
+                                {proj.description}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="pt-4 border-t border-[#1B2A4A]/8 flex items-center justify-between gap-2">
+                            {startingPrice ? (
+                              <span className="text-xs font-bold text-[#1B2A4A]/70">{startingPrice}</span>
+                            ) : <span />}
+                            <a
+                              href={`/p/${proj.slug}`}
+                              className="bg-[#1B2A4A] hover:bg-[#F26D5B] text-white font-bold py-2.5 px-4 rounded-xl transition-colors text-xs flex items-center justify-center gap-1.5 shadow-sm"
+                            >
+                              <span>Réserver</span>
+                              <span className="group-hover:translate-x-1 transition-transform">→</span>
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </section>
       )}
 

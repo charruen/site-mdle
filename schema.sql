@@ -93,6 +93,8 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
   id BIGINT PRIMARY KEY DEFAULT 1,
   marquee_text TEXT DEFAULT '⚠️ Bienvenue sur le site de la MDLE !',
   marquee_active BOOLEAN DEFAULT false,
+  promo_text TEXT DEFAULT '',
+  promo_active BOOLEAN DEFAULT false,
   opening_hours JSONB DEFAULT '[
     {"day": "Lundi", "hours": "9h - 17h"},
     {"day": "Mardi", "hours": "9h - 17h"},
@@ -180,3 +182,26 @@ CREATE POLICY "Lecture publique des settings"
   FOR SELECT
   TO anon, authenticated
   USING (true);
+
+-- Initialisation de la ligne de configuration unique (id = 1) dans Supabase
+INSERT INTO public.site_settings (id, marquee_text, marquee_active, opening_hours, bureau_members)
+VALUES (
+  1,
+  '⚠️ Bienvenue sur le site de la MDLE !',
+  false,
+  '[
+    {"day": "Lundi", "hours": "9h - 16h"},
+    {"day": "Mardi", "hours": "9h - 16h"},
+    {"day": "Mercredi", "hours": "9h - 13h"},
+    {"day": "Jeudi", "hours": "9h - 16h"},
+    {"day": "Vendredi", "hours": "9h - 13h"}
+  ]'::jsonb,
+  '[
+    {"role": "Président", "name": "Thomas", "emoji": "👑"},
+    {"role": "Vice-Présidente 1", "name": "Mari", "emoji": "⚡"},
+    {"role": "Vice-Présidente 2", "name": "Lisa", "emoji": "⚡"},
+    {"role": "Trésorier", "name": "Nathan", "emoji": "💰"}
+  ]'::jsonb
+)
+ON CONFLICT (id) DO NOTHING;
+

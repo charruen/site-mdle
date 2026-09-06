@@ -13,7 +13,7 @@ type MenuItem = { id: number; title: string; category: string; price: string; de
 type EventItem = { id: number; title: string; date: string; location: string | null; price: string | null; description: string | null; payment_link: string | null }
 type BureauMember = { role: string; name: string; emoji: string }
 type OpeningHour = { day: string; hours: string }
-type SiteSettings = { marquee_text: string; marquee_active: boolean; opening_hours: OpeningHour[]; bureau_members: BureauMember[] }
+type SiteSettings = { marquee_text: string; marquee_active: boolean; promo_text?: string; promo_active?: boolean; opening_hours: OpeningHour[]; bureau_members: BureauMember[] }
 
 type ActiveTab = 'overview' | 'menu' | 'agenda' | 'projects' | 'settings'
 
@@ -31,6 +31,8 @@ export default function AdminPage() {
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({
     marquee_text: '',
     marquee_active: false,
+    promo_text: '',
+    promo_active: false,
     opening_hours: [],
     bureau_members: [],
   })
@@ -80,7 +82,14 @@ export default function AdminPage() {
       }
       if (settingsRes.ok) {
         const s = await settingsRes.json()
-        setSiteSettings(s)
+        setSiteSettings({
+          marquee_text: s.marquee_text || '',
+          marquee_active: Boolean(s.marquee_active),
+          promo_text: s.promo_text || '',
+          promo_active: Boolean(s.promo_active),
+          opening_hours: Array.isArray(s.opening_hours) ? s.opening_hours : [],
+          bureau_members: Array.isArray(s.bureau_members) ? s.bureau_members : [],
+        })
       }
     } catch { /* pas critique */ }
   }, [])
@@ -526,6 +535,30 @@ export default function AdminPage() {
                   value={siteSettings.marquee_text}
                   onChange={e => setSiteSettings({ ...siteSettings, marquee_text: e.target.value })}
                   placeholder="Ex: ⚠️ Le foyer est fermé ce jeudi"
+                  className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm"
+                />
+              </div>
+
+              {/* Message / Offre Promo Cafétéria */}
+              <div className="bg-white border border-[#1B2A4A]/10 rounded-2xl p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-[#F2A63C]" />
+                    <h3 className="font-black text-base">Offre / Message Promo (Section Carte)</h3>
+                  </div>
+                  <button
+                    onClick={() => setSiteSettings({ ...siteSettings, promo_active: !siteSettings.promo_active })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${siteSettings.promo_active ? 'bg-[#F2A63C]' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${siteSettings.promo_active ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+                <p className="text-xs text-[#1B2A4A]/50">S'affiche sous le titre de La Carte (ex: « Tout à moins de 3€ », « Formule du jour disponible ! »).</p>
+                <input
+                  type="text"
+                  value={siteSettings.promo_text || ''}
+                  onChange={e => setSiteSettings({ ...siteSettings, promo_text: e.target.value })}
+                  placeholder="Ex: ✨ Tout à moins de 3€ au foyer !"
                   className="w-full bg-[#FAFAF8] border border-[#1B2A4A]/10 rounded-xl p-3 text-sm"
                 />
               </div>
