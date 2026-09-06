@@ -26,19 +26,17 @@ const MARQUEE_WORDS = [
 
 const DEFAULT_BUREAU = [
   { role: "Président", name: "Thomas", emoji: "👑" },
-  { role: "Vice-Présidente 1", name: "Marie", emoji: "⚡" },
+  { role: "Vice-Présidente 1", name: "Mari", emoji: "⚡" },
   { role: "Vice-Présidente 2", name: "Lisa", emoji: "⚡" },
   { role: "Trésorier", name: "Nathan", emoji: "💰" },
-  { role: "Trésorier Adjoint", name: "Esteban", emoji: "💰" },
-  { role: "Secrétaire", name: "À définir", emoji: "📝" },
 ];
 
 const DEFAULT_HOURS = [
-  { day: "Lundi", hours: "9h - 17h" },
-  { day: "Mardi", hours: "9h - 17h" },
-  { day: "Mercredi", hours: "9h - 12h" },
-  { day: "Jeudi", hours: "9h - 17h" },
-  { day: "Vendredi", hours: "9h - 15h" },
+  { day: "Lundi", hours: "9h - 16h" },
+  { day: "Mardi", hours: "9h - 16h" },
+  { day: "Mercredi", hours: "9h - 13h" },
+  { day: "Jeudi", hours: "9h - 16h" },
+  { day: "Vendredi", hours: "9h - 13h" },
 ];
 
 const CATEGORIES = [
