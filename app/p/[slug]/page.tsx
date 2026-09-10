@@ -49,6 +49,21 @@ export default function DynamicProjectReservationPage() {
   }
 
   useEffect(() => {
+    try {
+      let visitorId = localStorage.getItem('mdle_visitor_id')
+      if (!visitorId) {
+        visitorId = 'v_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36)
+        localStorage.setItem('mdle_visitor_id', visitorId)
+      }
+      fetch('/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: window.location.pathname || `/p/${slug}`, visitorId }),
+      }).catch(() => {})
+    } catch { /* ignore storage error */ }
+  }, [slug])
+
+  useEffect(() => {
     if (!slug) return
 
     async function fetchProject() {

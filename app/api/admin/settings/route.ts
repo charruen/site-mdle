@@ -64,17 +64,40 @@ export async function POST(req: Request) {
     const body = await req.json()
     const supabase = getSupabaseAdmin()
 
-    const { data, error } = await supabase
+    // Essai d'upsert complet
+    let { data, error } = await supabase
       .from('site_settings')
       .upsert({ id: 1, ...body, updated_at: new Date().toISOString() })
       .select()
       .single()
 
+    // Si l'upsert échoue à cause des nouvelles colonnes promo absentes de la table Supabase existante
+    if (error && (error.message?.includes('promo_text') || error.message?.includes('promo_active') || error.code === 'PGRST204')) {
+      const { promo_text, promo_active, ...fallbackBody } = body
+      const retry = await supabase
+        .from('site_settings')
+        .upsert({ id: 1, ...fallbackBody, updated_at: new Date().toISOString() })
+        .select()
+        .single()
+
+      if (!retry.error && retry.data) {
+        return NextResponse.json({
+          ...retry.data,
+          promo_text,
+          promo_active,
+          warning: 'Les colonnes promo_text/promo_active n’existent pas encore dans Supabase. Exécute le script SQL de mise à jour.'
+        })
+      }
+    }
+
     if (error) throw error
 
     return NextResponse.json(data)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Erreur lors de la mise à jour des paramètres:', error)
-    return NextResponse.json({ error: 'Erreur interne' }, { status: 500 })
+    return NextResponse.json({
+      error: 'Erreur de sauvegarde',
+      details: error?.message || String(error)
+    }, { status: 500 })
   }
 }

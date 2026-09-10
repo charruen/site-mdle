@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import {
   Plus, Trash2, Lock, LogOut, ExternalLink, Copy, Check, Sparkles, X,
   Pencil, LayoutDashboard, Coffee, CalendarDays, Rocket, Settings, ChevronRight, Bell, BellOff,
-  UserRound, Clock, Save,
+  UserRound, Clock, Save, BarChart3, ChevronLeft, TrendingUp, Eye, Users,
 } from 'lucide-react'
 import { Project, PRESET_TEMPLATES, ProjectFormConfig } from '@/lib/projects'
 
@@ -14,6 +14,16 @@ type EventItem = { id: number; title: string; date: string; location: string | n
 type BureauMember = { role: string; name: string; emoji: string }
 type OpeningHour = { day: string; hours: string }
 type SiteSettings = { marquee_text: string; marquee_active: boolean; promo_text?: string; promo_active?: boolean; opening_hours: OpeningHour[]; bureau_members: BureauMember[] }
+
+type AnalyticsPeriod = 'day' | 'week' | 'month' | 'year'
+type AnalyticsData = {
+  period: AnalyticsPeriod
+  currentLabel: string
+  totalViews: number
+  totalUniques: number
+  peakLabel: string
+  chartData: { label: string; views: number; uniques: number }[]
+}
 
 type ActiveTab = 'overview' | 'menu' | 'agenda' | 'projects' | 'settings'
 
@@ -38,6 +48,13 @@ export default function AdminPage() {
   })
   const [settingsSaving, setSettingsSaving] = useState(false)
   const [settingsSaved, setSettingsSaved] = useState(false)
+
+  // Analytics State
+  const [analyticsPeriod, setAnalyticsPeriod] = useState<AnalyticsPeriod>('day')
+  const [analyticsDate, setAnalyticsDate] = useState<Date>(new Date())
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
+  const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null)
 
   // Menu item form
   const [editingMenuItemId, setEditingMenuItemId] = useState<number | null>(null)
@@ -93,6 +110,53 @@ export default function AdminPage() {
       }
     } catch { /* pas critique */ }
   }, [])
+
+  const fetchAnalytics = useCallback(async () => {
+    setAnalyticsLoading(true)
+    try {
+      const yyyy = analyticsDate.getFullYear()
+      const mm = String(analyticsDate.getMonth() + 1).padStart(2, '0')
+      const dd = String(analyticsDate.getDate()).padStart(2, '0')
+      const dateStr = `${yyyy}-${mm}-${dd}`
+
+      const res = await fetch(`/api/admin/analytics?period=${analyticsPeriod}&date=${dateStr}`, { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        setAnalyticsData(data)
+      }
+    } catch {
+      /* pas critique */
+    } finally {
+      setAnalyticsLoading(false)
+    }
+  }, [analyticsPeriod, analyticsDate])
+
+  const handleNavigateDate = (direction: 'prev' | 'next' | 'today') => {
+    if (direction === 'today') {
+      setAnalyticsDate(new Date())
+      return
+    }
+    const step = direction === 'prev' ? -1 : 1
+    const newDate = new Date(analyticsDate)
+
+    if (analyticsPeriod === 'day') {
+      newDate.setDate(newDate.getDate() + step)
+    } else if (analyticsPeriod === 'week') {
+      newDate.setDate(newDate.getDate() + step * 7)
+    } else if (analyticsPeriod === 'month') {
+      newDate.setMonth(newDate.getMonth() + step)
+    } else if (analyticsPeriod === 'year') {
+      newDate.setFullYear(newDate.getFullYear() + step)
+    }
+
+    setAnalyticsDate(newDate)
+  }
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      void fetchAnalytics()
+    }
+  }, [isAuthenticated, fetchAnalytics])
 
   useEffect(() => {
     async function checkSession() {
@@ -224,10 +288,16 @@ export default function AdminPage() {
     setSettingsSaving(true)
     try {
       const r = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(siteSettings) })
-      if (!r.ok) throw new Error('Erreur sauvegarde')
+      const resJson = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        throw new Error(resJson.details || resJson.error || 'Erreur lors de la sauvegarde')
+      }
+      if (resJson.warning) {
+        alert(resJson.warning)
+      }
       setSettingsSaved(true)
       setTimeout(() => setSettingsSaved(false), 3000)
-    } catch (err) { alert(err instanceof Error ? err.message : 'Erreur') }
+    } catch (err) { alert(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde') }
     finally { setSettingsSaving(false) }
   }
   const updateBureauMember = (i: number, field: keyof BureauMember, val: string) => {
@@ -366,6 +436,172 @@ export default function AdminPage() {
                   </div>
                 </div>
               )}
+
+              {/* ====== ANALYTICS / FRÉQUENTATION ====== */}
+              <div className="bg-white rounded-3xl p-6 md:p-8 border border-[#1B2A4A]/10 shadow-sm space-y-6">
+                
+                {/* En-tête & Sélection de période */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#1B2A4A]/8 pb-5">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-[#F26D5B]/10 text-[#F26D5B] rounded-2xl">
+                      <BarChart3 className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-lg text-[#1B2A4A]">Fréquentation & Statistiques</h3>
+                      <p className="text-xs text-[#1B2A4A]/50 font-medium">Analyse des visites et visiteurs uniques du site public</p>
+                    </div>
+                  </div>
+
+                  {/* Boutons de sélection de période */}
+                  <div className="flex items-center gap-1 bg-[#FAFAF8] p-1.5 rounded-2xl border border-[#1B2A4A]/10 self-start md:self-auto">
+                    {[
+                      { id: 'day', label: 'Jour' },
+                      { id: 'week', label: 'Semaine' },
+                      { id: 'month', label: 'Mois' },
+                      { id: 'year', label: 'Année' },
+                    ].map(p => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setAnalyticsPeriod(p.id as AnalyticsPeriod)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${analyticsPeriod === p.id ? 'bg-[#1B2A4A] text-white shadow-sm' : 'text-[#1B2A4A]/60 hover:text-[#1B2A4A]'}`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Barre de Navigation Temporelle */}
+                <div className="flex items-center justify-between bg-[#FAFAF8] p-3 rounded-2xl border border-[#1B2A4A]/8 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateDate('prev')}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl hover:bg-white text-[#1B2A4A]/70 hover:text-[#1B2A4A] transition border border-transparent hover:border-[#1B2A4A]/10"
+                  >
+                    <ChevronLeft className="w-4 h-4" /> Précédent
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#1B2A4A] font-black text-sm">{analyticsData?.currentLabel || 'Chargement...'}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleNavigateDate('today')}
+                      className="text-[10px] uppercase tracking-wider text-[#F26D5B] bg-[#F26D5B]/10 hover:bg-[#F26D5B] hover:text-white px-2.5 py-1 rounded-full transition font-bold"
+                    >
+                      Aujourd'hui
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateDate('next')}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl hover:bg-white text-[#1B2A4A]/70 hover:text-[#1B2A4A] transition border border-transparent hover:border-[#1B2A4A]/10"
+                  >
+                    Suivant <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Cartes Métriques Clés */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-[#FAFAF8] p-4 rounded-2xl border border-[#1B2A4A]/8 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center font-bold">
+                      <Eye className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#1B2A4A]/40">Vues totales</p>
+                      <p className="text-xl font-black text-[#1B2A4A]">{analyticsData ? analyticsData.totalViews : '-'}</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-[#FAFAF8] p-4 rounded-2xl border border-[#1B2A4A]/8 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#1B2A4A]/40">Visiteurs uniques</p>
+                      <p className="text-xl font-black text-[#1B2A4A]">{analyticsData ? analyticsData.totalUniques : '-'}</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-[#FAFAF8] p-4 rounded-2xl border border-[#1B2A4A]/8 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
+                      <TrendingUp className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#1B2A4A]/40">Pic d'affluence</p>
+                      <p className="text-xs font-black text-[#1B2A4A] truncate">{analyticsData ? analyticsData.peakLabel : '-'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Graphique de Fréquentation Interactif */}
+                <div className="space-y-2 pt-1">
+                  <div className="flex justify-between items-center text-xs text-[#1B2A4A]/50 font-bold px-1">
+                    <span>
+                      {analyticsPeriod === 'day' ? 'Par heure (00h - 23h)' : analyticsPeriod === 'week' ? 'Par jour de la semaine' : analyticsPeriod === 'month' ? 'Par jour du mois' : 'Par mois de l’année'}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#1B2A4A]" /> Vues
+                    </span>
+                  </div>
+
+                  <div className="bg-[#FAFAF8] p-4 md:p-6 rounded-3xl border border-[#1B2A4A]/8 relative min-h-[220px] flex items-end">
+                    {analyticsLoading && (
+                      <div className="absolute inset-0 bg-white/70 backdrop-blur-xs flex items-center justify-center z-10 rounded-3xl">
+                        <div className="w-8 h-8 border-3 border-[#1B2A4A] border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+
+                    {!analyticsData || analyticsData.chartData.length === 0 ? (
+                      <p className="w-full text-center text-xs text-[#1B2A4A]/50 font-bold py-12">Aucune donnée de fréquentation enregistrée pour cette période.</p>
+                    ) : (
+                      (() => {
+                        const maxVal = Math.max(...analyticsData.chartData.map(d => d.views), 1)
+                        return (
+                          <div className="w-full h-44 flex items-end justify-between gap-1 md:gap-2">
+                            {analyticsData.chartData.map((item, idx) => {
+                              const heightPct = item.views > 0 ? Math.max((item.views / maxVal) * 100, 10) : 4
+                              const isHovered = hoveredBarIndex === idx
+
+                              return (
+                                <div
+                                  key={idx}
+                                  onMouseEnter={() => setHoveredBarIndex(idx)}
+                                  onMouseLeave={() => setHoveredBarIndex(null)}
+                                  className="flex-1 flex flex-col items-center h-full justify-end group cursor-pointer relative"
+                                >
+                                  {/* Tooltip au survol */}
+                                  {isHovered && (
+                                    <div className="absolute -top-14 z-30 bg-[#1B2A4A] text-white text-[10px] font-bold px-3 py-1.5 rounded-xl shadow-xl whitespace-nowrap pointer-events-none animate-in fade-in slide-in-from-bottom-2">
+                                      <p className="text-[#F2A63C] font-black">{item.label}</p>
+                                      <p>{item.views} vue{item.views > 1 ? 's' : ''} • {item.uniques} unique{item.uniques > 1 ? 's' : ''}</p>
+                                    </div>
+                                  )}
+
+                                  {/* Colonne de graphique */}
+                                  <div className="w-full max-w-[28px] bg-gray-200/60 rounded-t-xl flex items-end overflow-hidden transition-all duration-200" style={{ height: `${heightPct}%` }}>
+                                    <div
+                                      className={`w-full transition-all duration-300 rounded-t-xl ${item.views > 0 ? (isHovered ? 'bg-[#F26D5B]' : 'bg-[#1B2A4A]') : 'bg-gray-300/60'}`}
+                                      style={{ height: '100%' }}
+                                    />
+                                  </div>
+
+                                  {/* Étiquette sous la colonne */}
+                                  <span className={`text-[9px] md:text-[10px] font-bold mt-2 truncate w-full text-center transition-colors ${isHovered ? 'text-[#F26D5B] font-black' : 'text-[#1B2A4A]/50'}`}>
+                                    {item.label.split(' ')[0]}
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )
+                      })()
+                    )}
+                  </div>
+                </div>
+
+              </div>
 
               {/* Projets actifs */}
               <div className="bg-white rounded-2xl p-5 border border-[#1B2A4A]/8 shadow-sm">
