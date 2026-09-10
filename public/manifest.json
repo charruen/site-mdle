@@ -1,0 +1,39 @@
+{
+  "name": "MDLE Jean Perrin",
+  "short_name": "MDLE",
+  "description": "L'application de la Maison des Lycéens et des Étudiants du Lycée Jean Perrin — Foyer, cafétéria, événements et projets.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAFAF8",
+  "theme_color": "#1B2A4A",
+  "orientation": "portrait-primary",
+  "lang": "fr",
+  "categories": ["lifestyle", "education"],
+  "icons": [
+    {
+      "src": "/logo-mdle.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo-mdle.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "La Carte",
+      "url": "/#carte",
+      "description": "Accéder à la carte de la cafétéria"
+    },
+    {
+      "name": "Agenda",
+      "url": "/#agenda",
+      "description": "Voir les événements à venir"
+    }
+  ]
+}

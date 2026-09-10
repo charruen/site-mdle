@@ -114,6 +114,11 @@ export default function Home() {
     bureau_members: DEFAULT_BUREAU,
   });
 
+  // PWA — install prompt
+  const [pwaPrompt, setPwaPrompt] = useState<Event & { prompt?: () => Promise<void>; userChoice?: Promise<{ outcome: string }> } | null>(null);
+  const [pwaDismissed, setPwaDismissed] = useState(false);
+  const [pwaInstalled, setPwaInstalled] = useState(false);
+
   useEffect(() => {
     try {
       let visitorId = localStorage.getItem('mdle_visitor_id');
@@ -127,6 +132,35 @@ export default function Home() {
         body: JSON.stringify({ path: window.location.pathname || '/', visitorId }),
       }).catch(() => {});
     } catch { /* ignore storage error */ }
+  }, []);
+
+  // PWA — enregistrement du Service Worker & capture beforeinstallprompt
+  useEffect(() => {
+    // Vérifier si déjà installée (standalone)
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setPwaInstalled(true);
+      return;
+    }
+    // Vérifier si l'utilisateur a déjà refusé
+    try {
+      if (localStorage.getItem('mdle_pwa_dismissed') === '1') {
+        setPwaDismissed(true);
+      }
+    } catch { /* ignore */ }
+
+    // Enregistrement du service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+
+    // Capture de l'événement natif d'installation
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setPwaPrompt(e as Event & { prompt?: () => Promise<void>; userChoice?: Promise<{ outcome: string }> });
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', () => setPwaInstalled(true));
+    return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
   useEffect(() => {
@@ -275,8 +309,96 @@ END:VCALENDAR`;
     setContactSent(true);
   };
 
+  const handlePwaInstall = async () => {
+    if (!pwaPrompt) return;
+    const p = pwaPrompt as unknown as { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
+    await p.prompt();
+    const choice = await p.userChoice;
+    if (choice.outcome === 'accepted') setPwaInstalled(true);
+    setPwaPrompt(null);
+  };
+
+  const handlePwaDismiss = () => {
+    setPwaDismissed(true);
+    try { localStorage.setItem('mdle_pwa_dismissed', '1'); } catch { /* ignore */ }
+  };
+
+  const showPwaBanner = !pwaInstalled && !pwaDismissed && !!pwaPrompt;
+
   return (
     <div className="min-h-screen bg-[#FAFAF8] text-[#1B2A4A] font-sans antialiased">
+      {/* Bandeau d'installation PWA */}
+      {showPwaBanner && (
+        <div style={{
+          position: 'fixed',
+          bottom: '1rem',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 9999,
+          maxWidth: '420px',
+          width: 'calc(100% - 2rem)',
+          background: 'rgba(27, 42, 74, 0.97)',
+          backdropFilter: 'blur(16px)',
+          borderRadius: '16px',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          padding: '1rem 1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.875rem',
+          animation: 'slideUpBanner 0.4s cubic-bezier(.16,1,.3,1) both',
+        }}>
+          <style>{`
+            @keyframes slideUpBanner {
+              from { opacity: 0; transform: translateX(-50%) translateY(24px); }
+              to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+            }
+          `}</style>
+          {/* Icône */}
+          <div style={{
+            width: '48px', height: '48px', borderRadius: '12px',
+            background: 'white', flexShrink: 0, overflow: 'hidden',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <img src="/logo-mdle.png" alt="MDLE" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+          </div>
+          {/* Texte */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ color: 'white', fontWeight: 700, fontSize: '0.9rem', margin: 0, lineHeight: 1.3 }}>
+              Installer l&apos;app MDLE
+            </p>
+            <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.78rem', margin: '2px 0 0', lineHeight: 1.4 }}>
+              Accès rapide depuis votre écran d&apos;accueil
+            </p>
+          </div>
+          {/* Bouton installer */}
+          <button
+            onClick={handlePwaInstall}
+            style={{
+              background: 'white', color: '#1B2A4A',
+              border: 'none', borderRadius: '10px',
+              padding: '0.5rem 0.875rem', fontWeight: 700,
+              fontSize: '0.82rem', cursor: 'pointer', flexShrink: 0,
+              whiteSpace: 'nowrap',
+              transition: 'opacity 0.15s',
+            }}
+          >
+            Installer
+          </button>
+          {/* Bouton fermer */}
+          <button
+            onClick={handlePwaDismiss}
+            aria-label="Fermer"
+            style={{
+              background: 'transparent', border: 'none',
+              color: 'rgba(255,255,255,0.5)', fontSize: '1.25rem',
+              cursor: 'pointer', padding: '0 0.25rem', lineHeight: 1, flexShrink: 0,
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-[#1B2A4A]/10 bg-[#FAFAF8]/90 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-5 py-4 flex justify-between items-center">
