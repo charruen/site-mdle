@@ -104,6 +104,8 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [contactMessage, setContactMessage] = useState({ name: "", email: "", msg: "" });
   const [contactSent, setContactSent] = useState(false);
+  const [contactError, setContactError] = useState("");
+  const [contactLoading, setContactLoading] = useState(false);
 
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({
     marquee_text: '',
@@ -302,11 +304,28 @@ END:VCALENDAR`;
     document.body.removeChild(link);
   };
 
-  const handleContactSubmit = (e: React.FormEvent) => {
+  const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const mailtoUrl = `mailto:mdle.jeanperrin.marseille@gmail.com?subject=Contact%20MDLE%20de%20${encodeURIComponent(contactMessage.name)}&body=${encodeURIComponent(contactMessage.msg + "\n\nDe : " + contactMessage.email)}`;
-    window.location.href = mailtoUrl;
-    setContactSent(true);
+    setContactError("");
+    setContactLoading(true);
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(contactMessage),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setContactError(data.error || 'Une erreur est survenue, réessaie plus tard.');
+      } else {
+        setContactSent(true);
+        setContactMessage({ name: '', email: '', msg: '' });
+      }
+    } catch {
+      setContactError('Impossible d\'envoyer le message. Vérifie ta connexion.');
+    } finally {
+      setContactLoading(false);
+    }
   };
 
   const handlePwaInstall = async () => {
@@ -975,10 +994,21 @@ END:VCALENDAR`;
               />
               <button
                 type="submit"
-                className="w-full bg-[#F26D5B] hover:bg-white hover:text-[#1B2A4A] text-white font-bold py-2.5 rounded-xl text-xs transition-colors"
+                disabled={contactLoading}
+                className="w-full bg-[#F26D5B] hover:bg-white hover:text-[#1B2A4A] text-white font-bold py-2.5 rounded-xl text-xs transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {contactSent ? "Application Mail ouverte !" : "Envoyer à la MDLE 📩"}
+                {contactLoading ? "Envoi en cours…" : "Envoyer à la MDLE 📩"}
               </button>
+              {contactSent && (
+                <p className="text-green-400 text-xs text-center font-semibold">
+                  ✅ Message envoyé ! On te répondra dès que possible.
+                </p>
+              )}
+              {contactError && (
+                <p className="text-red-400 text-xs text-center">
+                  ❌ {contactError}
+                </p>
+              )}
             </form>
 
             {/* Réseaux sociaux */}
