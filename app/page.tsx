@@ -1,1064 +1,1023 @@
-"use client";
+'use client'
 
-import Image from "next/image";
-import React, { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
+import React, { useState } from 'react'
 
-// Initialisation Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+type RoseColor = 'rouge' | 'rose'
 
-const NAV_LINKS = [
-  { href: "#infos", label: "Infos & Bureau" },
-  { href: "#carte", label: "La Carte" },
-  { href: "#agenda", label: "Agenda" },
-  { href: "#projets", label: "Projets & Ventes" },
-  { href: "#contact", label: "Contact" },
-];
+type OrderResult = {
+  id: string
+  created_at: string
+  recipient_name: string
+  recipient_class: string
+  red_roses_count: number
+  pink_roses_count: number
+  has_message: boolean
+  message_text: string | null
+  is_anonymous: boolean
+  sender_name: string | null
+  total_amount: number
+  payment_method: 'sumup_online' | 'mdle_counter'
+  payment_status: 'pending' | 'paid'
+  sumup_checkout_id: string | null
+}
 
-const MARQUEE_WORDS = [
-  "PAR LES LYCÉENS",
-  "POUR LES LYCÉENS",
-  "MDLE JEAN PERRIN",
-  "REJOINS-NOUS",
-];
+const PRICE_PER_ROSE = 2.00
+const PRICE_MOT_DOUX = 0.50
 
-const DEFAULT_BUREAU = [
-  { role: "Président", name: "Thomas", emoji: "👑" },
-  { role: "Vice-Présidente 1", name: "Mari", emoji: "⚡" },
-  { role: "Vice-Présidente 2", name: "Lisa", emoji: "⚡" },
-  { role: "Trésorier", name: "Nathan", emoji: "💰" },
-];
+const CLASSES_LIST = [
+  'Seconde 1',
+  'Seconde 2',
+  'Seconde 3',
+  'Seconde 4',
+  'Seconde 5',
+  'Première 1',
+  'Première 2',
+  'Première 3',
+  'Première 4 - HGGSP',
+  'Terminale 1 - Maths',
+  'Terminale 2',
+  'Terminale 3 - SES',
+  'Terminale 4',
+  'Salle des Professeurs',
+  'Vie Scolaire',
+  'Secrétariat / CDI',
+]
 
-const DEFAULT_HOURS = [
-  { day: "Lundi", hours: "9h - 16h" },
-  { day: "Mardi", hours: "9h - 16h" },
-  { day: "Mercredi", hours: "9h - 13h" },
-  { day: "Jeudi", hours: "9h - 16h" },
-  { day: "Vendredi", hours: "9h - 13h" },
-];
+export default function StorePage() {
+  // Quantité et couleurs individuelles
+  const [roseCount, setRoseCount] = useState<number>(3)
+  const [roseColors, setRoseColors] = useState<RoseColor[]>(['rouge', 'rouge', 'rose'])
 
-const CATEGORIES = [
-  "TOUT",
-  "Ventes Saisonnières",
-  "Boissons",
-  "Snacks sucrés",
-  "Snacks salés",
-  "Formules",
-];
+  // Informations destinataire
+  const [recipientName, setRecipientName] = useState('')
+  const [recipientClass, setRecipientClass] = useState('')
 
-type MenuItem = {
-  id: number;
-  title: string;
-  category: string;
-  price: string;
-  description: string | null;
-  is_available: boolean;
-  created_at?: string;
-};
+  // Mot doux
+  const [hasMotDoux, setHasMotDoux] = useState(false)
+  const [motDouxText, setMotDouxText] = useState('')
 
-type AgendaEvent = {
-  id: number;
-  title: string;
-  date: string; // ex: "2026-09-15" ou format lisible
-  location: string | null;
-  description: string | null;
-  payment_link: string | null;
-  price: string | null;
-};
+  // Anonymat & expéditeur
+  const [isAnonymous, setIsAnonymous] = useState(true)
+  const [senderName, setSenderName] = useState('')
 
-type ActiveProject = {
-  id: number;
-  slug: string;
-  title: string;
-  description: string | null;
-  emoji: string | null;
-  badge_tag: string | null;
-  form_config?: {
-    base_price?: number;
-    options?: {
-      id: string;
-      label: string;
-      choices: { name: string; price: number }[];
-    }[];
-  };
-};
+  // Méthode de paiement
+  const [paymentMethod, setPaymentMethod] = useState<'sumup_online' | 'mdle_counter'>('sumup_online')
 
-type SiteSettings = {
-  marquee_text: string;
-  marquee_active: boolean;
-  promo_text?: string;
-  promo_active?: boolean;
-  opening_hours: { day: string; hours: string }[];
-  bureau_members: { role: string; name: string; emoji: string }[];
-};
+  // État de soumission et modal
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [createdOrder, setCreatedOrder] = useState<OrderResult | null>(null)
+  const [paymentDone, setPaymentDone] = useState(false)
 
-export default function Home() {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [agendaEvents, setAgendaEvents] = useState<AgendaEvent[]>([]);
-  const [activeProjects, setActiveProjects] = useState<ActiveProject[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<string>("TOUT");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [contactMessage, setContactMessage] = useState({ name: "", email: "", msg: "" });
-  const [contactSent, setContactSent] = useState(false);
-  const [contactError, setContactError] = useState("");
-  const [contactLoading, setContactLoading] = useState(false);
+  // Calcul du montant total
+  const redCount = roseColors.filter((c) => c === 'rouge').length
+  const pinkCount = roseColors.filter((c) => c === 'rose').length
+  const totalRoses = roseCount
+  const rosesTotal = totalRoses * PRICE_PER_ROSE
+  const motDouxTotal = hasMotDoux ? PRICE_MOT_DOUX : 0
+  const grandTotal = rosesTotal + motDouxTotal
+  const grandTotalFormatted = grandTotal.toFixed(2).replace('.', ',') + ' €'
 
-  const [siteSettings, setSiteSettings] = useState<SiteSettings>({
-    marquee_text: '',
-    marquee_active: false,
-    promo_text: '',
-    promo_active: false,
-    opening_hours: DEFAULT_HOURS,
-    bureau_members: DEFAULT_BUREAU,
-  });
+  // Gestion de la quantité
+  const updateCount = (newCount: number) => {
+    if (newCount < 1 || newCount > 20) return
+    setRoseCount(newCount)
+    if (newCount > roseColors.length) {
+      const added: RoseColor[] = Array.from(
+        { length: newCount - roseColors.length },
+        (_, i) => ((roseColors.length + i) % 2 === 0 ? 'rouge' : 'rose')
+      )
+      setRoseColors([...roseColors, ...added])
+    } else {
+      setRoseColors(roseColors.slice(0, newCount))
+    }
+  }
 
-  // PWA — install prompt
-  const [pwaPrompt, setPwaPrompt] = useState<Event & { prompt?: () => Promise<void>; userChoice?: Promise<{ outcome: string }> } | null>(null);
-  const [pwaDismissed, setPwaDismissed] = useState(false);
-  const [pwaInstalled, setPwaInstalled] = useState(false);
+  const setColorAt = (index: number, color: RoseColor) => {
+    const updated = [...roseColors]
+    updated[index] = color
+    setRoseColors(updated)
+  }
 
-  useEffect(() => {
+  const setAllColors = (color: RoseColor) => {
+    setRoseColors(Array(roseCount).fill(color))
+  }
+
+  const setRandomColors = () => {
+    setRoseColors(
+      Array.from({ length: roseCount }, () => (Math.random() > 0.5 ? 'rouge' : 'rose'))
+    )
+  }
+
+  // Ouverture du modal de validation
+  const handleOpenCheckout = () => {
+    setErrorMessage('')
+    if (!recipientName.trim()) {
+      setErrorMessage('Veuillez indiquer le nom et prénom du destinataire.')
+      const el = document.getElementById('recipient-name')
+      el?.focus()
+      return
+    }
+    if (!recipientClass.trim()) {
+      setErrorMessage('Veuillez indiquer la classe ou la salle du destinataire.')
+      const el = document.getElementById('recipient-class')
+      el?.focus()
+      return
+    }
+    setIsModalOpen(true)
+  }
+
+  // Envoi réel de la commande à l'API
+  const handleConfirmOrder = async (simulateOnlinePayment = false) => {
+    setIsSubmitting(true)
+    setErrorMessage('')
+
     try {
-      let visitorId = localStorage.getItem('mdle_visitor_id');
-      if (!visitorId) {
-        visitorId = 'v_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
-        localStorage.setItem('mdle_visitor_id', visitorId);
-      }
-      fetch('/api/track', {
+      const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: window.location.pathname || '/', visitorId }),
-      }).catch(() => {});
-    } catch { /* ignore storage error */ }
-  }, []);
+        body: JSON.stringify({
+          recipient_name: recipientName.trim(),
+          recipient_class: recipientClass.trim(),
+          red_roses_count: redCount,
+          pink_roses_count: pinkCount,
+          has_message: hasMotDoux,
+          message_text: hasMotDoux ? motDouxText.trim() : null,
+          is_anonymous: isAnonymous,
+          sender_name: isAnonymous ? null : senderName.trim(),
+          payment_method: paymentMethod,
+        }),
+      })
 
-  // PWA — enregistrement du Service Worker & capture beforeinstallprompt
-  useEffect(() => {
-    // Vérifier si déjà installée (standalone)
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setPwaInstalled(true);
-      return;
-    }
-    // Vérifier si l'utilisateur a déjà refusé
-    try {
-      if (localStorage.getItem('mdle_pwa_dismissed') === '1') {
-        setPwaDismissed(true);
-      }
-    } catch { /* ignore */ }
-
-    // Enregistrement du service worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
-    }
-
-    // Capture de l'événement natif d'installation
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setPwaPrompt(e as Event & { prompt?: () => Promise<void>; userChoice?: Promise<{ outcome: string }> });
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-    window.addEventListener('appinstalled', () => setPwaInstalled(true));
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
-
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      if (!supabase) {
-        setLoading(false);
-        return;
-      }
-
-      const { data: menuData } = await supabase.from("menu_items").select("*").order("id");
-      const { data: agendaData } = await supabase.from("events").select("*").order("id");
-
-      try {
-        const { data: projData } = await supabase
-          .from("projects")
-          .select("*")
-          .eq("is_active", true)
-          .order("id", { ascending: false });
-
-        if (projData) setActiveProjects(projData);
-      } catch {
-        setActiveProjects([]);
-      }
-
-      if (menuData) setMenuItems(menuData);
-      if (agendaData) setAgendaEvents(agendaData);
-
-      try {
-        const { data: settingsData } = await supabase.from('site_settings').select('*').eq('id', 1).single();
-        if (settingsData) {
-          setSiteSettings({
-            marquee_text: settingsData.marquee_text || '',
-            marquee_active: Boolean(settingsData.marquee_active),
-            promo_text: settingsData.promo_text || '',
-            promo_active: Boolean(settingsData.promo_active),
-            opening_hours: Array.isArray(settingsData.opening_hours) ? settingsData.opening_hours : DEFAULT_HOURS,
-            bureau_members: Array.isArray(settingsData.bureau_members) ? settingsData.bureau_members : DEFAULT_BUREAU,
-          });
-        }
-      } catch { /* valeurs par défaut */ }
-
-      setLoading(false);
-    }
-
-    fetchData();
-  }, []);
-
-  // Calcul du statut "Ouvert maintenant"
-  const checkIsOpen = () => {
-    const now = new Date();
-    const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
-    const currentDay = days[now.getDay()];
-    const currentHour = now.getHours() + now.getMinutes() / 60;
-
-    const hoursList = siteSettings.opening_hours || [];
-    const todaySetting = hoursList.find(h => h.day.toLowerCase() === currentDay.toLowerCase());
-    if (!todaySetting) return false;
-
-    // Exemple de parsing simple "9h - 17h"
-    const match = todaySetting.hours.match(/(\d+)h?\s*-\s*(\d+)h?/i);
-    if (!match) return false;
-
-    const openTime = parseInt(match[1], 10);
-    const closeTime = parseInt(match[2], 10);
-
-    return currentHour >= openTime && currentHour < closeTime;
-  };
-
-  const isOpen = checkIsOpen();
-
-  // Traitement et tri de la carte
-  const isNewItem = (createdAt?: string) => {
-    if (!createdAt) return false;
-    const diffDays = (new Date().getTime() - new Date(createdAt).getTime()) / (1000 * 3600 * 24);
-    return diffDays <= 7;
-  };
-
-  const getStartingPrice = (proj: ActiveProject): string | null => {
-    if (!proj.form_config) return null;
-    const base = proj.form_config.base_price || 0;
-    let minOption = Infinity;
-    if (proj.form_config.options) {
-      for (const opt of proj.form_config.options) {
-        if (opt.choices) {
-          for (const c of opt.choices) {
-            if (typeof c.price === 'number' && c.price < minOption) {
-              minOption = c.price;
-            }
-          }
-        }
-      }
-    }
-    const finalMin = (minOption !== Infinity ? minOption : 0) + base;
-    if (finalMin > 0) return `À partir de ${finalMin.toFixed(2).replace('.', ',')} €`;
-    return null;
-  };
-
-  const filteredMenuItems = menuItems
-    .filter((item) => {
-      if (selectedCategory === "TOUT") return item.is_available;
-      return item.category === selectedCategory;
-    })
-    .sort((a, b) => {
-      // Mettre les "Ventes Saisonnières" et les dispo en haut
-      if (a.category === "Ventes Saisonnières" && b.category !== "Ventes Saisonnières") return -1;
-      if (b.category === "Ventes Saisonnières" && a.category !== "Ventes Saisonnières") return 1;
-      if (a.is_available === b.is_available) return 0;
-      return a.is_available ? -1 : 1;
-    });
-
-  // Filtrage des événements passés
-  const futureAgendaEvents = agendaEvents.filter((event) => {
-    const eventDate = new Date(event.date);
-    if (isNaN(eventDate.getTime())) return true; // Si format texte libre, on garde
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return eventDate >= today;
-  });
-
-  // Générateur .ics
-  const downloadICS = (event: AgendaEvent) => {
-    const icsContent = `BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//MDLE Jean Perrin//FR
-BEGIN:VEVENT
-SUMMARY:${event.title}
-DESCRIPTION:${event.description || "Événement MDLE"}
-LOCATION:${event.location || "Lycée Jean Perrin"}
-END:VEVENT
-END:VCALENDAR`;
-
-    const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
-    const link = document.createElement("a");
-    link.href = window.URL.createObjectURL(blob);
-    link.setAttribute("download", `${event.title.replace(/\s+/g, "_")}.ics`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleContactSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setContactError("");
-    setContactLoading(true);
-    try {
-      const res = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(contactMessage),
-      });
+      const data = await res.json()
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setContactError(data.error || 'Une erreur est survenue, réessaie plus tard.');
-      } else {
-        setContactSent(true);
-        setContactMessage({ name: '', email: '', msg: '' });
+        throw new Error(data.error || 'Erreur lors de l’enregistrement de la commande.')
       }
-    } catch {
-      setContactError('Impossible d\'envoyer le message. Vérifie ta connexion.');
+
+      setCreatedOrder(data.order)
+
+      if (paymentMethod === 'sumup_online' && simulateOnlinePayment) {
+        // Simulation ou validation directe de paiement en ligne
+        setPaymentDone(true)
+      } else if (paymentMethod === 'mdle_counter') {
+        // Enregistrement de la réservation comptoir
+        setPaymentDone(true)
+      } else {
+        setPaymentDone(true)
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Une erreur inattendue est survenue.'
+      setErrorMessage(msg)
+      alert(msg)
     } finally {
-      setContactLoading(false);
+      setIsSubmitting(false)
     }
-  };
+  }
 
-  const handlePwaInstall = async () => {
-    if (!pwaPrompt) return;
-    const p = pwaPrompt as unknown as { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
-    await p.prompt();
-    const choice = await p.userChoice;
-    if (choice.outcome === 'accepted') setPwaInstalled(true);
-    setPwaPrompt(null);
-  };
-
-  const handlePwaDismiss = () => {
-    setPwaDismissed(true);
-    try { localStorage.setItem('mdle_pwa_dismissed', '1'); } catch { /* ignore */ }
-  };
-
-  const showPwaBanner = !pwaInstalled && !pwaDismissed && !!pwaPrompt;
+  const handleResetForm = () => {
+    setIsModalOpen(false)
+    setPaymentDone(false)
+    setCreatedOrder(null)
+    setRecipientName('')
+    setRecipientClass('')
+    setMotDouxText('')
+    setHasMotDoux(false)
+    setSenderName('')
+    setIsAnonymous(true)
+    setRoseCount(3)
+    setRoseColors(['rouge', 'rouge', 'rose'])
+  }
 
   return (
-    <div className="min-h-screen bg-[#FAFAF8] text-[#1B2A4A] font-sans antialiased">
-      {/* Bandeau d'installation PWA */}
-      {showPwaBanner && (
-        <div style={{
-          position: 'fixed',
-          bottom: '1rem',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 9999,
-          maxWidth: '420px',
-          width: 'calc(100% - 2rem)',
-          background: 'rgba(27, 42, 74, 0.97)',
-          backdropFilter: 'blur(16px)',
-          borderRadius: '16px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          padding: '1rem 1.25rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.875rem',
-          animation: 'slideUpBanner 0.4s cubic-bezier(.16,1,.3,1) both',
-        }}>
-          <style>{`
-            @keyframes slideUpBanner {
-              from { opacity: 0; transform: translateX(-50%) translateY(24px); }
-              to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-            }
-          `}</style>
-          {/* Icône */}
-          <div style={{
-            width: '48px', height: '48px', borderRadius: '12px',
-            background: 'white', flexShrink: 0, overflow: 'hidden',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <img src="/logo-mdle.png" alt="MDLE" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
-          </div>
-          {/* Texte */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ color: 'white', fontWeight: 700, fontSize: '0.9rem', margin: 0, lineHeight: 1.3 }}>
-              Installer l&apos;app MDLE
-            </p>
-            <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.78rem', margin: '2px 0 0', lineHeight: 1.4 }}>
-              Accès rapide depuis votre écran d&apos;accueil
-            </p>
-          </div>
-          {/* Bouton installer */}
-          <button
-            onClick={handlePwaInstall}
-            style={{
-              background: 'white', color: '#1B2A4A',
-              border: 'none', borderRadius: '10px',
-              padding: '0.5rem 0.875rem', fontWeight: 700,
-              fontSize: '0.82rem', cursor: 'pointer', flexShrink: 0,
-              whiteSpace: 'nowrap',
-              transition: 'opacity 0.15s',
-            }}
-          >
-            Installer
-          </button>
-          {/* Bouton fermer */}
-          <button
-            onClick={handlePwaDismiss}
-            aria-label="Fermer"
-            style={{
-              background: 'transparent', border: 'none',
-              color: 'rgba(255,255,255,0.5)', fontSize: '1.25rem',
-              cursor: 'pointer', padding: '0 0.25rem', lineHeight: 1, flexShrink: 0,
-            }}
-          >
-            ×
-          </button>
-        </div>
-      )}
+    <div className="bg-surface font-body-md text-on-surface antialiased selection:bg-primary-fixed selection:text-on-primary-fixed min-h-screen">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-[#1B2A4A]/10 bg-[#FAFAF8]/90 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-5 py-4 flex justify-between items-center">
-          <a href="#" className="flex items-center gap-2.5 group">
-            <Image
-              src="/logo-mdle.png"
-              alt="Logo MDLE Jean Perrin"
-              width={36}
-              height={36}
-              className="w-9 h-9 rounded-full object-cover shrink-0 group-hover:scale-105 transition-transform"
-            />
-            <span className="text-lg font-black tracking-tight">
-              MDLE <span className="text-[#F26D5B]">Jean Perrin</span>
+      <header className="fixed top-0 w-full z-50 bg-surface-container-lowest/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
+        <div className="h-16 max-w-[1200px] mx-auto px-4 md:px-margin-desktop flex items-center justify-between">
+          <div className="flex items-center gap-space-md">
+            <div className="flex items-center gap-space-sm">
+              <span className="font-headline-sm text-headline-sm text-primary">MDLE</span>
+              <span className="font-body-sm text-body-sm text-on-surface-variant font-medium hidden sm:inline-block">•</span>
+              <span className="font-body-md text-body-md text-on-surface-variant hidden sm:inline-block">Lycée Jean Perrin</span>
+            </div>
+            <span className="hidden lg:inline-flex items-center px-space-sm py-space-xs rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm uppercase tracking-wider">
+              Opération Saint-Valentin
             </span>
-          </a>
-
-          <nav className="hidden md:flex items-center gap-8 text-sm font-semibold">
-            {NAV_LINKS.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className="relative py-1 text-[#1B2A4A]/70 hover:text-[#1B2A4A] transition-colors after:absolute after:left-0 after:-bottom-1 after:h-[2px] after:w-0 after:bg-[#F26D5B] after:rounded-full after:transition-all hover:after:w-full"
-              >
-                {link.label}
-              </a>
-            ))}
+          </div>
+          <nav className="flex items-center gap-space-xs p-space-xs rounded-full bg-surface-container-low/60">
             <a
-              href="/adherer"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-[#1B2A4A] text-white px-5 py-2.5 rounded-full hover:bg-[#F26D5B] transition-colors shadow-sm font-bold flex items-center gap-2"
+              href="#commander"
+              className="px-space-md py-space-xs font-label-md transition-colors bg-primary text-on-primary rounded-full shadow-sm"
             >
-              <span>🎟️</span> Adhérer
+              Commander
+            </a>
+            <a
+              href="#faq"
+              className="px-space-md py-space-xs rounded-full font-label-md text-label-md text-on-surface-variant transition-colors hover:text-on-surface"
+            >
+              L&apos;Opération
+            </a>
+            <a
+              href="/admin"
+              className="px-space-md py-space-xs rounded-full font-label-md text-label-md text-on-surface-variant transition-colors hover:text-on-surface flex items-center gap-1"
+            >
+              <span className="material-symbols-outlined text-[15px]">lock</span>
+              <span>Bureau</span>
             </a>
           </nav>
-
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="Ouvrir le menu"
-            aria-expanded={menuOpen}
-            className="md:hidden flex flex-col justify-center items-center w-10 h-10 gap-1.5"
-          >
-            <span className={`block w-6 h-0.5 rounded-full bg-[#1B2A4A] transition-transform ${menuOpen ? "rotate-45 translate-y-2" : ""}`} />
-            <span className={`block w-6 h-0.5 rounded-full bg-[#1B2A4A] transition-opacity ${menuOpen ? "opacity-0" : ""}`} />
-            <span className={`block w-6 h-0.5 rounded-full bg-[#1B2A4A] transition-transform ${menuOpen ? "-rotate-45 -translate-y-2" : ""}`} />
-          </button>
-        </div>
-
-        {/* Mobile Navigation Drawer */}
-        <div className={`md:hidden overflow-hidden transition-[max-height] duration-300 ease-in-out ${menuOpen ? "max-h-80" : "max-h-0"}`}>
-          <nav className="flex flex-col gap-1 px-5 pb-4 text-sm font-semibold border-t border-[#1B2A4A]/5 pt-3">
-            {NAV_LINKS.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                onClick={() => setMenuOpen(false)}
-                className="py-2.5 border-b border-[#1B2A4A]/5 text-[#1B2A4A]/70 hover:text-[#1B2A4A] transition-colors"
-              >
-                {link.label}
-              </a>
-            ))}
-            <a
-              href="/adherer"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setMenuOpen(false)}
-              className="py-2.5 text-[#F26D5B] font-bold flex items-center gap-2"
-            >
-              <span>🎟️</span> Adhérer à la MDLE
-            </a>
-          </nav>
+          <div className="flex items-center gap-space-md">
+            <span className="hidden md:inline-block font-label-sm text-label-sm text-tertiary-container bg-tertiary-fixed px-space-sm py-space-xs rounded-full font-semibold">
+              14 Fév. 2025
+            </span>
+            <img
+              alt="Logo MDLE"
+              className="w-8 h-8 rounded-full object-cover shadow-[0_1px_4px_rgba(0,0,0,0.08)] bg-white p-0.5"
+              src="/logo-mdle.png"
+            />
+          </div>
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="relative px-5 pt-12 pb-16 md:pt-20 md:pb-24 overflow-hidden">
-        <div className="pointer-events-none absolute -top-16 -right-24 w-72 h-72 rounded-full bg-[#F2A63C]/15 blur-2xl" />
-        <div className="pointer-events-none absolute top-32 -left-20 w-64 h-64 rounded-full bg-[#2E8B7A]/15 blur-2xl" />
+      {/* Main Content */}
+      <main className="w-full pt-16 bg-surface min-h-[calc(100vh-80px)]">
+        <div className="flex flex-col w-full">
+          <div className="relative w-full max-w-[1200px] mx-auto px-margin md:px-margin-desktop py-space-md md:py-space-xl">
+            {/* Subtle Ambient Glow Orbs */}
+            <div className="absolute top-10 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none -z-10" />
+            <div className="absolute top-48 right-12 w-80 h-80 bg-tertiary-fixed/30 rounded-full blur-3xl pointer-events-none -z-10" />
 
-        <div className="relative max-w-6xl mx-auto">
-          <span className="inline-flex items-center gap-2 bg-white border border-[#1B2A4A]/10 text-[#1B2A4A] text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-full mb-6 shadow-sm">
-            <span className="w-1.5 h-1.5 bg-[#F26D5B] rounded-full animate-pulse" />
-            Année 2026 - 2027
-          </span>
-
-          <h1 className="font-black leading-[0.95] tracking-tight text-[11vw] md:text-[6vw] lg:text-[5.5rem]">
-            Ton lycée, <br />
-            <span className="text-[#F26D5B]">tes</span> événements, <br />
-            <span className="relative inline-block">
-              ta MDLE.
-              <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 300 20" preserveAspectRatio="none" aria-hidden="true">
-                <path d="M0 15 Q75 0 150 12 T300 8" stroke="#F2A63C" strokeWidth="8" strokeLinecap="round" fill="none" />
-              </svg>
-            </span>
-          </h1>
-
-          <div className="mt-8 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-            <p className="max-w-md text-[#1B2A4A]/60 text-base leading-relaxed">
-              La Maison des Lycéens et des Étudiants, c’est l’asso gérée par des élèves, pour les élèves.
-              Foyer, projets, cafétéria et événements au Lycée Polyvalent Jean Perrin.
-            </p>
-
-            <div className="flex flex-wrap gap-3">
-              <a href="#infos" className="bg-[#1B2A4A] text-white font-bold text-sm px-5 py-3 rounded-full hover:bg-[#F26D5B] transition-colors shadow-sm">
-                ℹ️ Infos pratiques
-              </a>
-              <a href="#carte" className="bg-[#F2A63C] text-[#1B2A4A] font-bold text-sm px-5 py-3 rounded-full hover:bg-[#1B2A4A] hover:text-white transition-colors shadow-sm">
-                🍕 La Carte
-              </a>
-              <a href="#agenda" className="bg-[#F26D5B] text-white font-bold text-sm px-5 py-3 rounded-full hover:bg-[#1B2A4A] transition-colors shadow-sm">
-                📅 Événements
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Bandeau d'annonce */}
-      {siteSettings.marquee_active && siteSettings.marquee_text ? (
-        <div className="bg-[#F26D5B] text-white py-3 px-5 text-center text-sm font-bold shadow-inner" role="alert">
-          {siteSettings.marquee_text}
-        </div>
-      ) : (
-        <div className="bg-[#1B2A4A] text-white py-3 overflow-hidden" aria-label="Actualités de la MDLE">
-          <div className="marquee-track flex w-max whitespace-nowrap">
-            {[0, 1].map((groupIndex) => (
-              <div key={groupIndex} className="flex shrink-0" aria-hidden={groupIndex === 1}>
-                {[0, 1].map((repeatIndex) => (
-                  <React.Fragment key={repeatIndex}>
-                    {MARQUEE_WORDS.map((word, wordIndex) => (
-                      <span key={`${groupIndex}-${repeatIndex}-${wordIndex}`} className="mx-6 inline-flex items-center gap-6 text-sm font-bold uppercase tracking-widest">
-                        {word}
-                        <span className="text-[#F2A63C]">✦</span>
-                      </span>
-                    ))}
-                  </React.Fragment>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Section Infos & Bureau */}
-      <section id="infos" className="max-w-6xl mx-auto px-5 py-16 md:py-24">
-        <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <span className="text-xs font-bold uppercase tracking-widest text-[#F26D5B]">
-              Au quotidien
-            </span>
-            <h2 className="text-3xl md:text-5xl font-black tracking-tight mt-1">
-              Infos pratiques & Bureau
-            </h2>
-          </div>
-
-          {/* Badge Ouvert / Fermé */}
-          <div className={`inline-flex items-center gap-2.5 px-4 py-2 rounded-full font-bold text-xs shadow-sm border ${isOpen ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200"}`}>
-            <span className={`w-2.5 h-2.5 rounded-full ${isOpen ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
-            {isOpen ? "Foyer OUVERT actuellement" : "Foyer FERMÉ actuellement"}
-          </div>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-8 mb-8">
-          {/* Bloc Horaires */}
-          <div className="bg-white border border-[#1B2A4A]/8 rounded-3xl p-6 md:p-8 shadow-sm">
-            <h3 className="text-xl font-black mb-6 flex items-center gap-2">
-              <span>📍</span> MDLE & Horaires
-            </h3>
-            <ul className="space-y-4 text-sm">
-              <li className="flex items-start gap-3">
-                <span className="w-8 h-8 rounded-full bg-[#F26D5B]/15 flex items-center justify-center shrink-0">🕒</span>
-                <div className="w-full">
-                  <p className="font-bold mb-1">Horaires d'ouverture</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {siteSettings.opening_hours.map((h, i) => (
-                      <div key={i} className="flex justify-between border-b border-[#1B2A4A]/5 pb-1 text-xs">
-                        <span className="font-semibold text-[#1B2A4A]">{h.day}</span>
-                        <span className="text-[#1B2A4A]/60">{h.hours}</span>
-                      </div>
-                    ))}
+            {/* Hero Header Banner with MDLE Brand Signature */}
+            <section className="mb-space-xl">
+              <div className="bg-surface-container-lowest/80 backdrop-blur-2xl rounded-3xl p-space-lg md:p-space-xl shadow-xl shadow-surface-container-highest/20 relative overflow-hidden">
+                <div className="flex flex-col md:flex-row items-center gap-space-lg md:gap-space-xl">
+                  {/* MDLE Emblem */}
+                  <div className="relative group shrink-0">
+                    <div className="absolute -inset-1.5 bg-gradient-to-r from-primary to-tertiary-fixed-dim rounded-full blur-md opacity-30 group-hover:opacity-60 transition duration-500" />
+                    <img
+                      alt="Logo MDLE Lycée Jean Perrin"
+                      className="relative w-24 h-24 md:w-28 md:h-28 rounded-full object-cover shadow-md bg-surface-container-lowest p-1"
+                      src="/logo-mdle.png"
+                    />
                   </div>
-                </div>
-              </li>
-              <li className="flex items-start gap-3 pt-2">
-                <span className="w-8 h-8 rounded-full bg-[#2E8B7A]/15 flex items-center justify-center shrink-0">🏫</span>
-                <div>
-                  <p className="font-bold">Localisation</p>
-                  <p className="text-[#1B2A4A]/60 text-xs">Au centre de la cour de récréation du Lycée Jean Perrin</p>
-                </div>
-              </li>
-            </ul>
-          </div>
-
-          {/* Bloc Équipe */}
-          <div className="bg-white border border-[#1B2A4A]/8 rounded-3xl p-6 md:p-8 shadow-sm">
-            <h3 className="text-xl font-black mb-6 flex items-center gap-2">
-              <span>👥</span> Les Élus de la MDLE
-            </h3>
-            <div className="grid sm:grid-cols-2 gap-3">
-              {siteSettings.bureau_members.map((member, i) => (
-                <div key={i} className="bg-[#FAFAF8] border border-[#1B2A4A]/5 rounded-2xl p-3.5 flex items-center gap-3">
-                  <span className="text-2xl shrink-0">{member.emoji}</span>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#1B2A4A]/40 truncate">
-                      {member.role}
+                  {/* Titles & Subheading */}
+                  <div className="flex-1 text-center md:text-left space-y-space-xs">
+                    <div className="inline-flex items-center gap-space-xs px-space-sm py-1 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm uppercase tracking-wider mb-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                      Édition Officielle 2025
+                    </div>
+                    <h1 className="font-headline-lg md:font-display-lg text-headline-lg md:text-display-lg text-on-surface tracking-tight leading-tight">
+                      Vente de Roses <span className="text-primary font-display-lg">Saint-Valentin</span>
+                    </h1>
+                    <p className="font-body-lg text-body-lg text-on-surface-variant max-w-xl">
+                      Faites livrer une rose en classe le vendredi 14 février par les délégués de la MDLE. Amour secret, admiration ou amitié pure.
                     </p>
-                    <p className="font-bold text-sm text-[#1B2A4A] truncate">{member.name}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* LA CARTE (Cafétéria) */}
-      <section id="carte" className="bg-[#1B2A4A] text-white py-16 md:py-24 rounded-[2.5rem] md:rounded-[3rem] mx-3 md:mx-5">
-        <div className="max-w-6xl mx-auto px-6 md:px-10">
-          <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-widest text-[#F2A63C]">
-                Foyer & Cafétéria
-              </span>
-              <h2 className="text-3xl md:text-5xl font-black tracking-tight mt-1">
-                La Carte de la MDLE
-              </h2>
-              <p className="text-white/50 text-sm mt-2 max-w-md">
-                Disponible à la vente pendant les horaires d’ouverture du foyer.
-              </p>
-              {siteSettings.promo_active && siteSettings.promo_text && (
-                <div className="mt-3 inline-flex items-center gap-2 bg-[#F2A63C]/20 border border-[#F2A63C]/40 text-[#F2A63C] px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm">
-                  <span>✨</span> {siteSettings.promo_text}
-                </div>
-              )}
-            </div>
-
-            {/* Switch Mode Grille / Liste */}
-            <div className="flex items-center gap-1 bg-white/10 p-1 rounded-full w-fit">
-              <button
-                onClick={() => setViewMode("grid")}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${viewMode === "grid" ? "bg-[#F2A63C] text-[#1B2A4A]" : "text-white/70 hover:text-white"}`}
-              >
-                📱 Grille
-              </button>
-              <button
-                onClick={() => setViewMode("list")}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${viewMode === "list" ? "bg-[#F2A63C] text-[#1B2A4A]" : "text-white/70 hover:text-white"}`}
-              >
-                📄 Liste
-              </button>
-            </div>
-          </div>
-
-          {/* Filtres par catégories */}
-          <div className="flex flex-wrap gap-2 mb-8 overflow-x-auto pb-2">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap ${selectedCategory === cat
-                  ? "bg-[#F2A63C] text-[#1B2A4A] shadow-md scale-105"
-                  : "bg-white/10 text-white/80 hover:bg-white/20 border border-white/10"
-                  }`}
-              >
-                {cat === "Ventes Saisonnières" ? "✨ Ventes Saisonnières" : cat}
-              </button>
-            ))}
-          </div>
-
-          {loading ? (
-            <p className="text-white/60">Chargement de la carte...</p>
-          ) : filteredMenuItems.length === 0 ? (
-            <p className="text-white/60 py-8 text-center bg-white/5 rounded-3xl border border-white/10">
-              Aucun produit disponible pour le moment dans cette catégorie.
-            </p>
-          ) : viewMode === "grid" ? (
-            <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {filteredMenuItems.map((item) => (
-                <div
-                  key={item.id}
-                  className={`bg-white/5 border rounded-3xl p-6 backdrop-blur-sm flex flex-col justify-between transition-all ${item.is_available ? "border-white/10 hover:border-[#F2A63C]/40" : "border-red-500/30 opacity-60"}`}
-                >
-                  <div>
-                    <div className="flex justify-between items-start gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-[#F2A63C] bg-white/5 px-2.5 py-1 rounded-full">
-                        {item.category}
+                    {/* Price & Feature Badges */}
+                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-space-sm pt-space-xs">
+                      <span className="inline-flex items-center gap-1.5 px-space-md py-1.5 rounded-full bg-primary-fixed text-on-primary-fixed font-label-md text-label-md shadow-sm">
+                        <span className="material-symbols-outlined text-[16px] text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
+                          local_florist
+                        </span>
+                        2,00 € / rose fraîche
                       </span>
-                      <div className="flex gap-1">
-                        {isNewItem(item.created_at) && (
-                          <span className="text-[10px] font-bold text-amber-300 bg-amber-400/20 px-2 py-0.5 rounded-full border border-amber-400/30">
-                            Nouveau ✨
-                          </span>
-                        )}
-                        {!item.is_available && (
-                          <span className="text-[10px] font-bold text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20">
-                            Rupture
-                          </span>
-                        )}
-                      </div>
+                      <span className="inline-flex items-center gap-1.5 px-space-md py-1.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed font-label-md text-label-md shadow-sm">
+                        <span className="material-symbols-outlined text-[16px] text-tertiary" style={{ fontVariationSettings: "'FILL' 1" }}>
+                          history_edu
+                        </span>
+                        +0,50 € / mot doux scellé
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 px-space-md py-1.5 rounded-full bg-surface-container text-on-surface font-label-md text-label-md">
+                        <span className="material-symbols-outlined text-[16px]">verified</span>
+                        Livraison en classe assurée
+                      </span>
                     </div>
-                    <h3 className="text-lg font-black tracking-tight mt-3">{item.title}</h3>
-                    {item.description && (
-                      <p className="text-xs text-white/50 mt-1 whitespace-pre-line leading-relaxed">{item.description}</p>
-                    )}
-                  </div>
-                  <div className="mt-4 pt-3 border-t border-white/10 flex justify-between items-center">
-                    <span className="text-xs text-white/40">Prix</span>
-                    <span className="font-bold text-[#F2A63C] text-lg">{item.price}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden divide-y divide-white/10">
-              {filteredMenuItems.map((item) => (
-                <div key={item.id} className="p-4 flex items-center justify-between gap-4 hover:bg-white/5 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm">{item.title}</span>
-                        {isNewItem(item.created_at) && (
-                          <span className="text-[9px] font-bold text-amber-300 bg-amber-400/20 px-1.5 py-0.5 rounded-full">
-                            Nouveau ✨
-                          </span>
-                        )}
-                        {!item.is_available && (
-                          <span className="text-[9px] font-bold text-red-400 bg-red-500/20 px-1.5 py-0.5 rounded-full">
-                            Rupture
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-white/50 truncate max-w-xs">{item.description || item.category}</p>
-                    </div>
-                  </div>
-                  <span className="font-bold text-[#F2A63C] text-base shrink-0">{item.price}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* AGENDA - TIMELINE */}
-      <section id="agenda" className="max-w-6xl mx-auto px-5 py-16 md:py-24">
-        <div className="mb-12">
-          <span className="text-xs font-bold uppercase tracking-widest text-[#2E8B7A]">
-            Planning & Projets
-          </span>
-          <h2 className="text-3xl md:text-5xl font-black tracking-tight mt-1">
-            Agenda à venir
-          </h2>
-        </div>
-
-        {loading ? (
-          <p className="text-[#1B2A4A]/60">Chargement de l’agenda...</p>
-        ) : futureAgendaEvents.length === 0 ? (
-          <p className="text-[#1B2A4A]/60 p-6 bg-white border border-[#1B2A4A]/8 rounded-3xl">
-            Aucune date importante prévue pour le moment.
-          </p>
-        ) : (
-          <div className="relative border-l-2 border-[#2E8B7A]/30 ml-4 md:ml-6 pl-6 md:pl-8 space-y-8">
-            {futureAgendaEvents.map((event) => (
-              <div key={event.id} className="relative group">
-                {/* Pastille timeline */}
-                <div className="absolute -left-[31px] md:-left-[39px] top-1.5 w-4 h-4 rounded-full bg-[#2E8B7A] border-4 border-[#FAFAF8] group-hover:scale-125 transition-transform" />
-
-                <div className="bg-white border border-[#1B2A4A]/8 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <span className="text-xs font-black text-[#2E8B7A] uppercase tracking-wider bg-[#2E8B7A]/10 px-3 py-1 rounded-full">
-                      📅 {event.date}
-                    </span>
-                    <h3 className="text-xl font-black tracking-tight mt-2 text-[#1B2A4A] group-hover:text-[#F26D5B] transition-colors">
-                      {event.title}
-                    </h3>
-                    {event.description && (
-                      <p className="text-sm text-[#1B2A4A]/60 mt-1 whitespace-pre-line leading-relaxed">{event.description}</p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-[#1B2A4A]/5">
-                    {event.price && (
-                      <span className="text-xs font-bold text-[#F26D5B] bg-[#F26D5B]/10 px-3 py-1.5 rounded-full">
-                        🎟️ {event.price}
-                      </span>
-                    )}
-                    {event.location && (
-                      <span className="text-xs font-bold text-[#1B2A4A]/60 bg-[#1B2A4A]/5 px-3 py-1.5 rounded-full">
-                        📍 {event.location}
-                      </span>
-                    )}
-                    <button
-                      onClick={() => downloadICS(event)}
-                      className="text-xs font-bold text-[#1B2A4A] bg-[#FAFAF8] border border-[#1B2A4A]/15 hover:bg-[#1B2A4A] hover:text-white px-3 py-1.5 rounded-full transition-colors flex items-center gap-1"
-                    >
-                      🗓️ Google/Apple
-                    </button>
-                    {event.payment_link && (
-                      <a
-                        href={event.payment_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs font-bold text-white bg-[#F26D5B] hover:bg-[#1B2A4A] px-4 py-2 rounded-full transition-colors"
-                      >
-                        Payer →
-                      </a>
-                    )}
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+            </section>
 
-      {/* PROJETS & OPÉRATIONS EN COURS */}
-      {activeProjects.length > 0 && (
-        <section id="projets" className="max-w-6xl mx-auto px-5 pb-16 md:pb-24">
-          <div className="mb-8">
-            <span className="text-xs font-bold uppercase tracking-widest text-[#F26D5B]">
-              Opérations & Réservations
-            </span>
-            <h2 className="text-3xl md:text-5xl font-black tracking-tight mt-1">
-              Événements en cours
-            </h2>
-          </div>
+            {/* Error banner if validation failed */}
+            {errorMessage && (
+              <div className="mb-space-md p-space-md rounded-2xl bg-error-container text-on-error-container font-label-md text-label-md flex items-center gap-2">
+                <span className="material-symbols-outlined text-[20px]">error</span>
+                <span>{errorMessage}</span>
+              </div>
+            )}
 
-          {/* Premier projet à la une (Bannière Hero) */}
-          {(() => {
-            const firstProj = activeProjects[0];
-            const otherProjs = activeProjects.slice(1);
-            const firstStartingPrice = getStartingPrice(firstProj);
-
-            return (
-              <div className="space-y-8">
-                <div className="bg-white border-2 border-[#F26D5B]/30 rounded-3xl p-6 md:p-10 shadow-lg hover:shadow-xl transition-all relative overflow-hidden group">
-                  <div className="pointer-events-none absolute -top-12 -right-12 w-48 h-48 rounded-full bg-[#F26D5B]/10 blur-xl" />
-
-                  <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="space-y-3 max-w-xl">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-5xl">{firstProj.emoji || "🚀"}</span>
-                        <span className="text-xs font-bold uppercase tracking-wider text-[#F26D5B] bg-[#F26D5B]/10 px-3 py-1 rounded-full border border-[#F26D5B]/20">
-                          🔥 À LA UNE — {firstProj.badge_tag || "Opération MDLE"}
-                        </span>
-                        {firstStartingPrice && (
-                          <span className="text-xs font-black text-[#1B2A4A] bg-[#F2A63C]/20 border border-[#F2A63C]/30 px-3 py-1 rounded-full">
-                            🏷️ {firstStartingPrice}
-                          </span>
-                        )}
-                      </div>
-
-                      <h3 className="text-2xl md:text-3xl font-black text-[#1B2A4A] group-hover:text-[#F26D5B] transition-colors">
-                        {firstProj.title}
-                      </h3>
-
-                      {firstProj.description && (
-                        <p className="text-sm text-[#1B2A4A]/70 leading-relaxed whitespace-pre-line">
-                          {firstProj.description}
+            {/* Main Two-Column Workflow */}
+            <div id="commander" className="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-start">
+              {/* LEFT COLUMN: Interactive Configuration Flow (8 cols) */}
+              <div className="lg:col-span-8 flex flex-col gap-space-lg">
+                {/* 1. ROSE QUANTITY & COLOR CUSTOMIZER */}
+                <section className="bg-surface-container-lowest/90 backdrop-blur-xl rounded-3xl p-space-lg md:p-space-xl shadow-lg shadow-surface-container-highest/15 space-y-space-md">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-space-sm">
+                      <span className="w-8 h-8 rounded-full bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center justify-center">
+                        1
+                      </span>
+                      <div>
+                        <h2 className="font-headline-sm text-headline-sm text-on-surface">
+                          Nombre &amp; Couleurs des Roses
+                        </h2>
+                        <p className="font-body-sm text-body-sm text-on-surface-variant">
+                          Personnalisez chaque fleur de votre bouquet
                         </p>
+                      </div>
+                    </div>
+                    {/* Stepper Container */}
+                    <div className="flex items-center gap-space-sm bg-surface-container-low px-space-sm py-1.5 rounded-full shadow-inner">
+                      <button
+                        aria-label="Retirer une rose"
+                        onClick={() => updateCount(roseCount - 1)}
+                        className="w-9 h-9 rounded-full bg-surface-container-lowest text-on-surface flex items-center justify-center hover:bg-surface-container transition shadow-sm active:scale-95 disabled:opacity-40"
+                        disabled={roseCount <= 1}
+                        type="button"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">remove</span>
+                      </button>
+                      <span className="font-headline-md text-headline-md text-on-surface w-8 text-center tabular-nums">
+                        {roseCount}
+                      </span>
+                      <button
+                        aria-label="Ajouter une rose"
+                        onClick={() => updateCount(roseCount + 1)}
+                        className="w-9 h-9 rounded-full bg-surface-container-lowest text-on-surface flex items-center justify-center hover:bg-surface-container transition shadow-sm active:scale-95 disabled:opacity-40"
+                        disabled={roseCount >= 20}
+                        type="button"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">add</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Quick presets pills */}
+                  <div className="flex items-center gap-space-xs pt-space-xs flex-wrap">
+                    <span className="font-label-sm text-label-sm text-on-surface-variant pr-1">Raccourcis :</span>
+                    <button
+                      onClick={() => setAllColors('rouge')}
+                      className="px-space-md py-1 rounded-full bg-surface-container-low hover:bg-primary-fixed hover:text-on-primary-fixed font-label-md text-label-md text-on-surface transition active:scale-95"
+                      type="button"
+                    >
+                      Toutes Rouges ❤️
+                    </button>
+                    <button
+                      onClick={() => setAllColors('rose')}
+                      className="px-space-md py-1 rounded-full bg-surface-container-low hover:bg-secondary-container hover:text-on-secondary-container font-label-md text-label-md text-on-surface transition active:scale-95"
+                      type="button"
+                    >
+                      Toutes Roses 🌸
+                    </button>
+                    <button
+                      onClick={setRandomColors}
+                      className="px-space-md py-1 rounded-full bg-surface-container-low hover:bg-tertiary-fixed hover:text-on-tertiary-fixed font-label-md text-label-md text-on-surface transition active:scale-95"
+                      type="button"
+                    >
+                      Mélange Aléatoire ✨
+                    </button>
+                  </div>
+
+                  {/* Dynamic Roses Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-space-md pt-space-sm">
+                    {roseColors.map((color, idx) => (
+                      <div
+                        key={idx}
+                        className="p-space-sm bg-surface-container-low rounded-2xl flex flex-col gap-2 transition hover:bg-surface-container"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">
+                            Rose #{idx + 1}
+                          </span>
+                          <span
+                            className={`w-3 h-3 rounded-full ${
+                              color === 'rouge' ? 'bg-primary' : 'bg-pink-400'
+                            } shadow-xs`}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-1 p-1 bg-surface-container-lowest rounded-xl">
+                          <button
+                            type="button"
+                            onClick={() => setColorAt(idx, 'rouge')}
+                            className={`py-1.5 rounded-lg font-label-sm text-label-sm flex items-center justify-center gap-1 transition ${
+                              color === 'rouge'
+                                ? 'bg-primary text-on-primary font-bold shadow-sm'
+                                : 'text-on-surface-variant hover:text-on-surface'
+                            }`}
+                          >
+                            <span>❤️</span>
+                            <span>Rouge</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setColorAt(idx, 'rose')}
+                            className={`py-1.5 rounded-lg font-label-sm text-label-sm flex items-center justify-center gap-1 transition ${
+                              color === 'rose'
+                                ? 'bg-pink-600 text-white font-bold shadow-sm'
+                                : 'text-on-surface-variant hover:text-on-surface'
+                            }`}
+                          >
+                            <span>🌸</span>
+                            <span>Rose</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                {/* 2. RECIPIENT INFORMATION (Destinataire) */}
+                <section className="bg-surface-container-lowest/90 backdrop-blur-xl rounded-3xl p-space-lg md:p-space-xl shadow-lg shadow-surface-container-highest/15 space-y-space-md">
+                  <div className="flex items-center gap-space-sm">
+                    <span className="w-8 h-8 rounded-full bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center justify-center">
+                      2
+                    </span>
+                    <div>
+                      <h2 className="font-headline-sm text-headline-sm text-on-surface">
+                        Destinataire &amp; Classe
+                      </h2>
+                      <p className="font-body-sm text-body-sm text-on-surface-variant">
+                        L&apos;élève ou professeur qui recevra votre attention
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md pt-space-xs">
+                    {/* Nom et prénom */}
+                    <div className="flex flex-col gap-space-xs">
+                      <label className="font-label-md text-label-md text-on-surface flex items-center gap-1" htmlFor="recipient-name">
+                        <span>Nom &amp; Prénom du destinataire</span>
+                        <span className="text-primary">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="recipient-name"
+                          value={recipientName}
+                          onChange={(e) => setRecipientName(e.target.value)}
+                          className="w-full bg-surface-container-low/70 focus:bg-surface-container-lowest text-on-surface rounded-2xl px-space-md py-3 font-body-md text-body-md transition focus:outline-none focus:ring-2 focus:ring-primary shadow-inner"
+                          placeholder="ex. Léa Martin ou M. Dupont"
+                          type="text"
+                          required
+                        />
+                        <span className="material-symbols-outlined absolute right-3.5 top-3.5 text-on-surface-variant text-[20px] pointer-events-none">
+                          person
+                        </span>
+                      </div>
+                    </div>
+                    {/* Classe ou statut */}
+                    <div className="flex flex-col gap-space-xs">
+                      <label className="font-label-md text-label-md text-on-surface flex items-center gap-1" htmlFor="recipient-class">
+                        <span>Classe / Salle</span>
+                        <span className="text-primary">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="recipient-class"
+                          value={recipientClass}
+                          onChange={(e) => setRecipientClass(e.target.value)}
+                          className="w-full bg-surface-container-low/70 focus:bg-surface-container-lowest text-on-surface rounded-2xl px-space-md py-3 font-body-md text-body-md transition focus:outline-none focus:ring-2 focus:ring-primary shadow-inner"
+                          list="classes-list"
+                          placeholder="ex. Terminale 2, 1ère 4, Salle des Profs..."
+                          type="text"
+                          required
+                        />
+                        <datalist id="classes-list">
+                          {CLASSES_LIST.map((cls) => (
+                            <option key={cls} value={cls} />
+                          ))}
+                        </datalist>
+                        <span className="material-symbols-outlined absolute right-3.5 top-3.5 text-on-surface-variant text-[20px] pointer-events-none">
+                          school
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Discretion Guarantee Callout */}
+                  <div className="p-space-md rounded-2xl bg-surface-container flex items-start gap-space-sm text-on-surface">
+                    <span className="material-symbols-outlined text-primary text-[22px] shrink-0 mt-0.5">
+                      sentiment_satisfied
+                    </span>
+                    <div className="text-body-sm">
+                      <span className="font-label-md font-bold">Engagement MDLE :</span> Distribution minutieuse assurée en toute discrétion et bienveillance entre 8h00 et 16h30 le vendredi 14 février 2025.
+                    </div>
+                  </div>
+                </section>
+
+                {/* 3. CUSTOM MESSAGE ("Mot Doux") & ANONYMITY */}
+                <section className="bg-surface-container-lowest/90 backdrop-blur-xl rounded-3xl p-space-lg md:p-space-xl shadow-lg shadow-surface-container-highest/15 space-y-space-md">
+                  <div className="flex items-center gap-space-sm">
+                    <span className="w-8 h-8 rounded-full bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center justify-center">
+                      3
+                    </span>
+                    <div>
+                      <h2 className="font-headline-sm text-headline-sm text-on-surface">
+                        Message Calligraphié &amp; Anonymat
+                      </h2>
+                      <p className="font-body-sm text-body-sm text-on-surface-variant">
+                        Un mot manuscrit scellé à la cire et remis avec la rose
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Card Toggle for Mot Doux */}
+                  <div className="bg-surface-container-low/60 rounded-2xl p-space-md flex items-center justify-between transition hover:bg-surface-container-low">
+                    <div className="flex items-center gap-space-sm">
+                      <span className="w-10 h-10 rounded-full bg-tertiary-fixed text-tertiary flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-[20px]">mail</span>
+                      </span>
+                      <div>
+                        <div className="font-label-lg text-label-lg text-on-surface font-semibold">
+                          Ajouter un mot doux calligraphié (+0,50 €)
+                        </div>
+                        <div className="font-body-sm text-body-sm text-on-surface-variant">
+                          Rédigé sur papier texturé avec cachet MDLE officiel
+                        </div>
+                      </div>
+                    </div>
+                    {/* Custom Toggle */}
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        id="toggle-mot-doux"
+                        type="checkbox"
+                        checked={hasMotDoux}
+                        onChange={(e) => setHasMotDoux(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-secondary-fixed rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
+                    </label>
+                  </div>
+
+                  {/* Collapsible Textarea for Message */}
+                  {hasMotDoux && (
+                    <div className="transition-all duration-300">
+                      <div className="p-space-md rounded-2xl bg-tertiary-fixed/20 space-y-space-xs relative">
+                        <div className="flex items-center justify-between">
+                          <span className="font-label-sm text-label-sm text-tertiary flex items-center gap-1 font-semibold">
+                            <span className="material-symbols-outlined text-[16px]">edit_note</span>
+                            Votre texte (max 200 caractères)
+                          </span>
+                          <span className="font-label-sm text-label-sm text-on-surface-variant">
+                            {motDouxText.length} / 200
+                          </span>
+                        </div>
+                        <textarea
+                          id="mot-doux-text"
+                          value={motDouxText}
+                          onChange={(e) => setMotDouxText(e.target.value.slice(0, 200))}
+                          className="w-full bg-surface-container-lowest/90 text-on-surface rounded-xl p-space-sm font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary shadow-sm resize-none"
+                          maxLength={200}
+                          placeholder="Écrivez votre message secret, tendre ou amical ici..."
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Anonymity Toggle Card */}
+                  <div className="bg-surface-container-low/60 rounded-2xl p-space-md space-y-space-sm">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-space-sm">
+                        <span className="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[20px]">visibility_off</span>
+                        </span>
+                        <div>
+                          <div className="font-label-lg text-label-lg text-on-surface font-semibold">
+                            Offrir en tout anonymat
+                          </div>
+                          <div className="font-body-sm text-body-sm text-on-surface-variant">
+                            Ne révélez pas votre nom sur l&apos;étiquette de livraison
+                          </div>
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          id="toggle-anonymous"
+                          type="checkbox"
+                          checked={isAnonymous}
+                          onChange={(e) => setIsAnonymous(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-secondary-fixed rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
+                      </label>
+                    </div>
+
+                    {/* Dynamic State depending on anonymity */}
+                    {isAnonymous ? (
+                      <div className="px-space-md py-2 rounded-xl bg-surface-container-lowest font-body-sm text-body-sm text-on-surface flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-tertiary">lock</span>
+                        <span>
+                          <strong>Anonymat Garanti :</strong> Le destinataire recevra uniquement la mention{' '}
+                          <em>&quot;Un admirateur ou une admiratrice secrète&quot;</em>.
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="pt-space-xs">
+                        <label className="font-label-md text-label-md text-on-surface mb-1 block font-semibold" htmlFor="sender-name">
+                          Votre prénom et nom (affiché sur la carte)
+                        </label>
+                        <input
+                          id="sender-name"
+                          value={senderName}
+                          onChange={(e) => setSenderName(e.target.value)}
+                          className="w-full bg-surface-container-lowest text-on-surface rounded-xl px-space-md py-2.5 font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary shadow-inner"
+                          placeholder="ex. Thomas Roux (T°3)"
+                          type="text"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                {/* 4. PAYMENT METHOD SELECTOR */}
+                <section className="bg-surface-container-lowest/90 backdrop-blur-xl rounded-3xl p-space-lg md:p-space-xl shadow-lg shadow-surface-container-highest/15 space-y-space-md">
+                  <div className="flex items-center gap-space-sm">
+                    <span className="w-8 h-8 rounded-full bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center justify-center">
+                      4
+                    </span>
+                    <div>
+                      <h2 className="font-headline-sm text-headline-sm text-on-surface">Mode de Règlement</h2>
+                      <p className="font-body-sm text-body-sm text-on-surface-variant">
+                        Directement en ligne ou au foyer du lycée
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md pt-space-xs">
+                    {/* Method 1: SumUp Online */}
+                    <div
+                      onClick={() => setPaymentMethod('sumup_online')}
+                      className={`cursor-pointer rounded-2xl p-space-md transition-all relative block shadow-sm hover:shadow-md ${
+                        paymentMethod === 'sumup_online'
+                          ? 'bg-surface-container ring-2 ring-primary/40'
+                          : 'bg-surface-container-low'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-space-sm">
+                          <span className="material-symbols-outlined text-primary text-[24px]">contactless</span>
+                          <div className="font-headline-sm text-headline-sm text-on-surface font-bold">
+                            En ligne sécurisé
+                          </div>
+                        </div>
+                        <input
+                          type="radio"
+                          name="payment_method"
+                          value="sumup_online"
+                          checked={paymentMethod === 'sumup_online'}
+                          onChange={() => setPaymentMethod('sumup_online')}
+                          className="accent-primary w-4 h-4 mt-1"
+                        />
+                      </div>
+                      <p className="font-body-sm text-body-sm text-on-surface-variant mt-space-sm">
+                        Paiement instantané certifié par <strong>SumUp</strong>. Validation immédiate de votre commande.
+                      </p>
+                      <div className="flex items-center gap-space-xs mt-space-sm flex-wrap">
+                        <span className="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm text-on-surface shadow-xs font-semibold">
+                          Apple Pay
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm text-on-surface shadow-xs font-semibold">
+                          Google Pay
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm text-on-surface shadow-xs font-semibold">
+                          CB
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm text-on-surface shadow-xs font-semibold">
+                          Visa
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Method 2: Counter MDLE */}
+                    <div
+                      onClick={() => setPaymentMethod('mdle_counter')}
+                      className={`cursor-pointer rounded-2xl p-space-md transition-all relative block shadow-sm hover:shadow-md ${
+                        paymentMethod === 'mdle_counter'
+                          ? 'bg-surface-container ring-2 ring-primary/40'
+                          : 'bg-surface-container-low'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-space-sm">
+                          <span className="material-symbols-outlined text-tertiary text-[24px]">storefront</span>
+                          <div className="font-headline-sm text-headline-sm text-on-surface font-bold">
+                            Au Foyer MDLE
+                          </div>
+                        </div>
+                        <input
+                          type="radio"
+                          name="payment_method"
+                          value="mdle_counter"
+                          checked={paymentMethod === 'mdle_counter'}
+                          onChange={() => setPaymentMethod('mdle_counter')}
+                          className="accent-primary w-4 h-4 mt-1"
+                        />
+                      </div>
+                      <p className="font-body-sm text-body-sm text-on-surface-variant mt-space-sm">
+                        Réglez en <strong>espèces</strong> ou <strong>CB sans contact</strong> lors des pauses récré ou entre 12h et 13h30.
+                      </p>
+                      <div className="flex items-center gap-space-xs mt-space-sm">
+                        <span className="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm text-on-surface shadow-xs font-semibold">
+                          Espèces
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm text-on-surface shadow-xs font-semibold">
+                          TPE au Foyer
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              {/* RIGHT COLUMN: Sticky Live Order Summary & Apple-style CTA (4 cols) */}
+              <aside className="lg:col-span-4 sticky top-20 flex flex-col gap-space-md">
+                {/* Summary Box */}
+                <div className="bg-surface-container-lowest/95 backdrop-blur-2xl rounded-3xl p-space-lg shadow-xl shadow-surface-container-highest/20 space-y-space-md">
+                  <div className="flex items-center justify-between pb-space-sm">
+                    <div className="flex items-center gap-space-xs">
+                      <span className="material-symbols-outlined text-primary text-[20px]">shopping_bag</span>
+                      <h3 className="font-headline-sm text-headline-sm text-on-surface font-bold">Récapitulatif</h3>
+                    </div>
+                    <span className="font-label-sm text-label-sm bg-primary-fixed text-on-primary-fixed px-2 py-0.5 rounded-full font-semibold">
+                      14 Février
+                    </span>
+                  </div>
+
+                  {/* Detailed dynamic breakdown */}
+                  <div className="space-y-space-sm font-body-md text-body-md">
+                    <div className="flex items-center justify-between text-on-surface">
+                      <span>
+                        {totalRoses}x Rose{totalRoses > 1 ? 's' : ''} fraîche{totalRoses > 1 ? 's' : ''}
+                      </span>
+                      <span className="font-semibold tabular-nums">
+                        {(totalRoses * PRICE_PER_ROSE).toFixed(2).replace('.', ',')} €
+                      </span>
+                    </div>
+
+                    {/* Color mini chips in summary */}
+                    <div className="flex flex-wrap gap-1 pb-1">
+                      {redCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm font-semibold">
+                          {redCount}x Rouge{redCount > 1 ? 's' : ''} ❤️
+                        </span>
+                      )}
+                      {pinkCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-full bg-pink-100 text-pink-900 font-label-sm text-label-sm font-semibold">
+                          {pinkCount}x Rose{pinkCount > 1 ? 's' : ''} 🌸
+                        </span>
                       )}
                     </div>
 
-                    <div className="shrink-0">
-                      <a
-                        href={`/p/${firstProj.slug}`}
-                        className="bg-[#1B2A4A] hover:bg-[#F26D5B] text-white font-bold py-4 px-8 rounded-2xl transition-all text-sm flex items-center justify-center gap-3 shadow-md hover:scale-105"
-                      >
-                        <span>Réserver / Commander</span>
-                        <span className="group-hover:translate-x-1 transition-transform">→</span>
-                      </a>
+                    {hasMotDoux && (
+                      <div className="flex items-center justify-between text-on-surface">
+                        <span className="flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[16px] text-tertiary">drafts</span>
+                          Mot doux calligraphié
+                        </span>
+                        <span className="font-semibold tabular-nums">+0,50 €</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between text-on-surface-variant font-body-sm text-body-sm">
+                      <span>Livraison en classe</span>
+                      <span className="text-on-surface font-medium">Offerte par la MDLE</span>
                     </div>
+                  </div>
+
+                  {/* Total Due Row */}
+                  <div className="pt-space-sm mt-space-sm bg-surface-container-low/50 p-space-md rounded-2xl flex items-center justify-between">
+                    <div>
+                      <div className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">
+                        Total à régler
+                      </div>
+                      <div className="font-body-sm text-body-sm text-on-surface-variant">
+                        TTC au profit des projets MDLE
+                      </div>
+                    </div>
+                    <div className="font-display-lg text-display-lg text-primary tabular-nums font-bold">
+                      {grandTotalFormatted}
+                    </div>
+                  </div>
+
+                  {/* Main CTA Trigger Button */}
+                  <button
+                    onClick={handleOpenCheckout}
+                    disabled={isSubmitting}
+                    className="w-full py-4 px-space-lg rounded-full bg-primary hover:bg-primary-container text-on-primary font-headline-sm text-headline-sm shadow-lg shadow-primary/30 flex items-center justify-center gap-space-sm transition-all duration-200 active:scale-95 group cursor-pointer disabled:opacity-60"
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-[20px] group-hover:rotate-12 transition-transform">
+                      lock
+                    </span>
+                    <span>
+                      {paymentMethod === 'sumup_online'
+                        ? `Commander et payer (${grandTotalFormatted})`
+                        : `Réserver sans payer (${grandTotalFormatted})`}
+                    </span>
+                  </button>
+
+                  {/* Safe badges & MDLE Guarantee */}
+                  <div className="text-center space-y-1 pt-space-xs">
+                    <p className="font-body-sm text-body-sm text-on-surface-variant flex items-center justify-center gap-1">
+                      <span className="material-symbols-outlined text-[16px] text-primary">verified_user</span>
+                      100% des bénéfices financent les sorties et événements lycéens.
+                    </p>
                   </div>
                 </div>
 
-                {/* Autres projets en grille */}
-                {otherProjs.length > 0 && (
-                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {otherProjs.map((proj) => {
-                      const startingPrice = getStartingPrice(proj);
-                      return (
-                        <div
-                          key={proj.id}
-                          className="bg-white border border-[#1B2A4A]/10 rounded-3xl p-6 shadow-sm hover:shadow-xl hover:border-[#F26D5B]/30 transition-all flex flex-col justify-between space-y-4 group"
-                        >
-                          <div>
-                            <div className="flex items-center justify-between gap-2 mb-3">
-                              <span className="text-4xl">{proj.emoji || "🚀"}</span>
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-[#F26D5B] bg-[#F26D5B]/10 px-2.5 py-1 rounded-full">
-                                {proj.badge_tag || "Opération MDLE"}
-                              </span>
-                            </div>
-                            <h3 className="text-xl font-black text-[#1B2A4A] group-hover:text-[#F26D5B] transition-colors">
-                              {proj.title}
-                            </h3>
-                            {proj.description && (
-                              <p className="text-xs text-[#1B2A4A]/60 mt-2 line-clamp-3 leading-relaxed whitespace-pre-line">
-                                {proj.description}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="pt-4 border-t border-[#1B2A4A]/8 flex items-center justify-between gap-2">
-                            {startingPrice ? (
-                              <span className="text-xs font-bold text-[#1B2A4A]/70">{startingPrice}</span>
-                            ) : <span />}
-                            <a
-                              href={`/p/${proj.slug}`}
-                              className="bg-[#1B2A4A] hover:bg-[#F26D5B] text-white font-bold py-2.5 px-4 rounded-xl transition-colors text-xs flex items-center justify-center gap-1.5 shadow-sm"
-                            >
-                              <span>Réserver</span>
-                              <span className="group-hover:translate-x-1 transition-transform">→</span>
-                            </a>
-                          </div>
-                        </div>
-                      );
-                    })}
+                {/* Secondary Info Card: Lycée Perrin MDLE FAQ */}
+                <div id="faq" className="bg-surface-container-lowest/80 backdrop-blur-md rounded-2xl p-space-md shadow-sm space-y-space-xs">
+                  <div className="font-label-md text-label-md text-on-surface flex items-center gap-1.5 font-bold">
+                    <span className="material-symbols-outlined text-tertiary text-[18px]">help_center</span>
+                    Comment se passe la distribution ?
                   </div>
-                )}
-              </div>
-            );
-          })()}
-        </section>
-      )}
-
-      {/* Footer / Contact */}
-      <footer id="contact" className="bg-[#1B2A4A] text-white rounded-t-[2.5rem] md:rounded-t-[3rem] mx-3 md:mx-5">
-        <div className="max-w-6xl mx-auto px-6 md:px-10 py-14 grid md:grid-cols-2 gap-10 items-start">
-          {/* Colonne Gauche : Contact Rapide */}
-          <div className="space-y-6">
-            <div className="flex items-center gap-3">
-              <Image
-                src="/logo-mdle.png"
-                alt="Logo MDLE Jean Perrin"
-                width={40}
-                height={40}
-                className="w-10 h-10 rounded-full object-cover shrink-0"
-              />
-              <span className="text-xl font-black tracking-tight">
-                MDLE <span className="text-[#F26D5B]">Jean Perrin</span>
-              </span>
+                  <p className="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+                    Les délégués de la MDLE passeront discrètement avec l&apos;autorisation du professeur dans chaque classe le vendredi 14 février. Les roses sont conservées chez notre fleuriste partenaire dans une fraîcheur absolue jusqu&apos;au matin-même.
+                  </p>
+                </div>
+              </aside>
             </div>
 
-            <p className="text-white/60 text-sm max-w-sm leading-relaxed">
-              Maison des Lycéens et des Étudiants — Lycée Polyvalent Jean Perrin, Marseille.
-            </p>
-
-            {/* Formulaire de Contact Rapide */}
-            <form onSubmit={handleContactSubmit} className="space-y-3 bg-white/5 p-5 rounded-3xl border border-white/10">
-              <p className="text-xs font-bold text-[#F2A63C] uppercase tracking-wider">Un message rapide ?</p>
-              <input
-                type="text"
-                placeholder="Ton Prénom / Nom"
-                required
-                value={contactMessage.name}
-                onChange={(e) => setContactMessage({ ...contactMessage, name: e.target.value })}
-                className="w-full bg-white/10 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-white/40 focus:outline-none focus:border-[#F26D5B]"
-              />
-              <input
-                type="email"
-                placeholder="Ton adresse email"
-                required
-                value={contactMessage.email}
-                onChange={(e) => setContactMessage({ ...contactMessage, email: e.target.value })}
-                className="w-full bg-white/10 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-white/40 focus:outline-none focus:border-[#F26D5B]"
-              />
-              <textarea
-                placeholder="Ton message..."
-                required
-                rows={3}
-                value={contactMessage.msg}
-                onChange={(e) => setContactMessage({ ...contactMessage, msg: e.target.value })}
-                className="w-full bg-white/10 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-white/40 focus:outline-none focus:border-[#F26D5B]"
-              />
-              <button
-                type="submit"
-                disabled={contactLoading}
-                className="w-full bg-[#F26D5B] hover:bg-white hover:text-[#1B2A4A] text-white font-bold py-2.5 rounded-xl text-xs transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            {/* Minimal Discreet Admin Access at the bottom */}
+            <div className="mt-space-xl pt-space-lg text-center">
+              <a
+                href="/admin"
+                className="inline-flex items-center gap-1.5 px-space-md py-1.5 rounded-full bg-surface-container-low/60 hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition font-label-sm text-label-sm opacity-60 hover:opacity-100"
               >
-                {contactLoading ? "Envoi en cours…" : "Envoyer à la MDLE 📩"}
-              </button>
-              {contactSent && (
-                <p className="text-green-400 text-xs text-center font-semibold">
-                  ✅ Message envoyé ! On te répondra dès que possible.
-                </p>
-              )}
-              {contactError && (
-                <p className="text-red-400 text-xs text-center">
-                  ❌ {contactError}
-                </p>
-              )}
-            </form>
-
-            {/* Réseaux sociaux */}
-            <div className="flex gap-4 pt-2">
-              <a href="https://www.instagram.com/mdle.perrin" target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-white/70 hover:text-[#F26D5B] flex items-center gap-1.5 bg-white/5 px-3 py-2 rounded-xl">
-                📸 Instagram
-              </a>
-              {/* <a href="https://www.tiktok.com/@mdle.perrin" target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-white/70 hover:text-[#F26D5B] flex items-center gap-1.5 bg-white/5 px-3 py-2 rounded-xl">
-                🎵 TikTok
-              </a> */}
-            </div>
-          </div>
-
-          {/* Colonne Droite : Bâtiment + Lien discret Admin */}
-          <div className="flex flex-col items-center md:items-end justify-between h-full gap-6">
-            <div className="bg-[#FAFAF8] p-3 rounded-3xl border border-white/10 shadow-sm overflow-hidden w-full">
-              <Image
-                src="/plan-acces.jpg"
-                alt="Bâtiment de la MDLE du Lycée Jean Perrin"
-                width={1200}
-                height={800}
-                className="w-full h-auto max-h-[300px] object-contain rounded-2xl"
-              />
-            </div>
-
-            <div className="flex justify-between items-center w-full text-[11px] text-white/30 pt-4 border-t border-white/5">
-              <span>© 2026 - MDLE Lycée Jean Perrin</span>
-              <a href="/admin" className="hover:text-white/60 transition-colors">
-                🔒 Espace Admin
+                <span className="material-symbols-outlined text-[14px]">lock</span>
+                <span>Espace bureau &amp; délégués MDLE</span>
               </a>
             </div>
           </div>
         </div>
-      </footer>
+      </main>
 
-      <style>{`
-        @keyframes marquee {
-          from { transform: translateX(0); }
-          to { transform: translateX(-50%); }
-        }
-        .marquee-track {
-          animation: marquee 32s linear infinite;
-          will-change: transform;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .marquee-track {
-            animation: none;
-          }
-        }
-      `}</style>
+      {/* SUMUP / CHECKOUT POPUP MODAL */}
+      {isModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-space-md bg-inverse-surface/60 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isSubmitting) setIsModalOpen(false)
+          }}
+        >
+          <div className="bg-surface-container-lowest w-full max-w-md rounded-3xl p-space-lg md:p-space-xl shadow-2xl relative">
+            {/* Close Button */}
+            {!isSubmitting && (
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="absolute top-5 right-5 w-8 h-8 rounded-full bg-surface-container text-on-surface flex items-center justify-center hover:bg-surface-container-high transition"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            )}
+
+            {!paymentDone ? (
+              <>
+                {/* Modal Header */}
+                <div className="flex flex-col items-center text-center space-y-1 mb-space-md">
+                  <div className="w-12 h-12 rounded-full bg-primary-fixed flex items-center justify-center text-primary mb-1">
+                    <span className="material-symbols-outlined text-[24px]">favorite</span>
+                  </div>
+                  <h3 className="font-headline-md text-headline-md text-on-surface font-bold">
+                    Confirmation de Commande
+                  </h3>
+                  <p className="font-body-sm text-body-sm text-on-surface-variant">
+                    Lycée Jean Perrin • MDLE Opération Roses 2025
+                  </p>
+                </div>
+
+                {/* Amount breakdown in modal */}
+                <div className="bg-surface-container-low rounded-2xl p-space-md space-y-space-xs mb-space-md">
+                  <div className="flex justify-between font-body-sm text-body-sm text-on-surface-variant">
+                    <span>Destinataire :</span>
+                    <span className="font-medium text-on-surface">
+                      {recipientName} ({recipientClass})
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-body-sm text-body-sm text-on-surface-variant">
+                    <span>Articles :</span>
+                    <span className="font-medium text-on-surface">
+                      {totalRoses} rose{totalRoses > 1 ? 's' : ''} ({redCount} rouge{redCount > 1 ? 's' : ''}, {pinkCount} rose{pinkCount > 1 ? 's' : ''})
+                      {hasMotDoux ? ' + mot doux' : ''}
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-body-sm text-body-sm text-on-surface-variant">
+                    <span>Expéditeur :</span>
+                    <span className="font-medium text-on-surface">
+                      {isAnonymous ? 'Anonyme 🤫' : senderName || 'Non précisé'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-headline-sm text-headline-sm text-on-surface pt-1 border-t border-surface-container-high">
+                    <span className="font-bold">Montant Total</span>
+                    <span className="text-primary font-bold">{grandTotalFormatted}</span>
+                  </div>
+                </div>
+
+                {/* Dynamic actions according to selected payment method */}
+                {paymentMethod === 'sumup_online' ? (
+                  <div className="space-y-space-sm">
+                    <button
+                      onClick={() => handleConfirmOrder(true)}
+                      disabled={isSubmitting}
+                      className="w-full py-3.5 px-space-md rounded-2xl bg-black text-white font-label-lg text-label-lg flex items-center justify-center gap-2 hover:opacity-90 transition active:scale-98 cursor-pointer disabled:opacity-50"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">contactless</span>
+                      <span>
+                        {isSubmitting ? 'Traitement en cours...' : 'Payer avec '}
+                        <strong>Apple Pay / Google Pay</strong>
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => handleConfirmOrder(true)}
+                      disabled={isSubmitting}
+                      className="w-full py-3 px-space-md rounded-2xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-lg text-label-lg flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">credit_card</span>
+                      <span>Carte Bancaire (Passerelle SumUp)</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-space-sm text-center">
+                    <div className="p-space-md rounded-2xl bg-tertiary-fixed/30 text-on-tertiary-fixed text-left space-y-1">
+                      <div className="font-label-md font-bold flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[16px]">pin_drop</span>
+                        Rendez-vous au foyer MDLE
+                      </div>
+                      <p className="font-body-sm text-body-sm">
+                        Présentez votre prénom aux délégués au foyer du lycée avant le <strong>jeudi 13 février 17h</strong> pour régler en pièces, billets ou carte bancaire.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleConfirmOrder(false)}
+                      disabled={isSubmitting}
+                      className="w-full py-3.5 px-space-md rounded-2xl bg-primary text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 hover:bg-primary-container transition active:scale-98 cursor-pointer disabled:opacity-50 font-bold"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">task_alt</span>
+                      <span>
+                        {isSubmitting ? 'Enregistrement...' : 'Valider ma réservation sans payer'}
+                      </span>
+                    </button>
+                  </div>
+                )}
+                <p className="text-center font-label-sm text-label-sm text-on-surface-variant mt-space-md">
+                  MDLE Perrin • Transaction chiffrée SSL 256 bits
+                </p>
+              </>
+            ) : (
+              /* Success State */
+              <div className="text-center py-space-lg space-y-space-sm animate-in zoom-in-95 duration-200">
+                <div className="w-16 h-16 rounded-full bg-surface-container-high mx-auto flex items-center justify-center text-primary mb-2">
+                  <span className="material-symbols-outlined text-[36px]">check_circle</span>
+                </div>
+                <h4 className="font-headline-md text-headline-md text-on-surface font-bold">
+                  Commande Enregistrée !
+                </h4>
+                {createdOrder && (
+                  <div className="inline-block px-3 py-1 rounded-full bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant font-mono">
+                    Réf : #{createdOrder.id.slice(0, 8).toUpperCase()}
+                  </div>
+                )}
+                <p className="font-body-md text-body-md text-on-surface-variant max-w-xs mx-auto">
+                  {paymentMethod === 'sumup_online'
+                    ? 'Merci pour votre paiement en ligne ! La livraison aura lieu discrètement en classe le vendredi 14 février 2025.'
+                    : 'Votre réservation est validée ! N’oubliez pas de passer au Foyer MDLE régler votre commande avant le 13 février 17h.'}
+                </p>
+                <div className="pt-space-md">
+                  <button
+                    onClick={handleResetForm}
+                    className="w-full py-3 px-space-xl rounded-full bg-primary hover:bg-primary-container text-on-primary font-label-md text-label-md transition font-bold"
+                    type="button"
+                  >
+                    Passer une autre commande
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <footer className="w-full bg-surface-container-lowest/90 py-space-lg shadow-[0_-1px_6px_rgba(0,0,0,0.02)] mt-12">
+        <div className="max-w-[1200px] mx-auto px-4 md:px-margin-desktop flex flex-col md:flex-row items-center justify-between gap-space-md">
+          <div className="flex items-center gap-space-sm font-body-sm text-body-sm text-on-surface-variant">
+            <span className="font-label-md text-label-md text-on-surface font-bold">MDLE Perrin</span>
+            <span>© 2025 Maison Des Lycéens</span>
+            <span className="hidden sm:inline">• Tous droits réservés</span>
+          </div>
+          <div className="flex items-center gap-space-lg font-label-sm text-label-sm text-on-surface-variant">
+            <a className="hover:text-on-surface transition-colors" href="#faq">
+              Règlement de livraison
+            </a>
+            <a
+              className="flex items-center gap-space-xs py-space-xs px-space-sm rounded-full bg-surface-container-low hover:bg-surface-container text-on-surface hover:text-on-surface transition-all"
+              href="/admin"
+              title="Accès Délégués & Administration"
+            >
+              <span className="material-symbols-outlined text-[16px]">lock</span>
+              <span>Espace MDLE</span>
+            </a>
+          </div>
+        </div>
+      </footer>
     </div>
-  );
+  )
 }

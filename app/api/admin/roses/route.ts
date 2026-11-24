@@ -4,19 +4,23 @@ import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 
 export const dynamic = 'force-dynamic'
 
-async function requireAdmin() {
+async function checkAdmin() {
   if (!(await isAdminAuthenticated())) {
-    return NextResponse.json({ error: 'Non autorisé.' }, { status: 401 })
+    return NextResponse.json({ error: 'Session non autorisée.' }, { status: 401 })
   }
   return null
 }
 
 export async function GET() {
-  const denied = await requireAdmin()
-  if (denied) return denied
+  const unauthorized = await checkAdmin()
+  if (unauthorized) return unauthorized
 
   try {
-    const { data, error } = await getSupabaseAdmin().from('rose_orders').select('*').order('id', { ascending: false })
+    const { data, error } = await getSupabaseAdmin()
+      .from('roses_orders')
+      .select('*')
+      .order('created_at', { ascending: false })
+
     if (error) throw error
     return NextResponse.json({ orders: data ?? [] })
   } catch (error) {
@@ -26,47 +30,61 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const denied = await requireAdmin()
-  if (denied) return denied
+  const unauthorized = await checkAdmin()
+  if (unauthorized) return unauthorized
 
   try {
-    const body = await request.json() as { id?: unknown; is_paid?: unknown; is_delivered?: unknown }
-    const id = Number(body.id)
-    if (!Number.isSafeInteger(id) || id < 1) {
-      return NextResponse.json({ error: 'Commande invalide.' }, { status: 400 })
+    const body = (await request.json()) as {
+      id?: string
+      payment_status?: string
     }
 
-    const changes: { is_paid?: boolean; is_delivered?: boolean } = {}
-    if (typeof body.is_paid === 'boolean') changes.is_paid = body.is_paid
-    if (typeof body.is_delivered === 'boolean') changes.is_delivered = body.is_delivered
-    if (Object.keys(changes).length === 0) {
-      return NextResponse.json({ error: 'Aucune modification valide.' }, { status: 400 })
+    const id = (body.id || '').trim()
+    if (!id) {
+      return NextResponse.json({ error: 'Identifiant de commande manquant.' }, { status: 400 })
     }
 
-    const { error } = await getSupabaseAdmin().from('rose_orders').update(changes).eq('id', id)
+    const payment_status = body.payment_status === 'paid' ? 'paid' : 'pending'
+
+    const { error } = await getSupabaseAdmin()
+      .from('roses_orders')
+      .update({ payment_status })
+      .eq('id', id)
+
     if (error) throw error
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, payment_status })
   } catch (error) {
-    console.error('Mise à jour des roses impossible :', error)
+    console.error('Mise à jour commande impossible :', error)
     return NextResponse.json({ error: 'Impossible de mettre à jour la commande.' }, { status: 500 })
   }
 }
 
 export async function DELETE(request: Request) {
-  const denied = await requireAdmin()
-  if (denied) return denied
-
-  const id = Number(new URL(request.url).searchParams.get('id'))
-  if (!Number.isSafeInteger(id) || id < 1) {
-    return NextResponse.json({ error: 'Commande invalide.' }, { status: 400 })
-  }
+  const unauthorized = await checkAdmin()
+  if (unauthorized) return unauthorized
 
   try {
-    const { error } = await getSupabaseAdmin().from('rose_orders').delete().eq('id', id)
+    const url = new URL(request.url)
+    let id = url.searchParams.get('id')
+
+    if (!id) {
+      const body = (await request.json().catch(() => ({}))) as { id?: string }
+      id = body.id || null
+    }
+
+    if (!id) {
+      return NextResponse.json({ error: 'Identifiant de commande requis.' }, { status: 400 })
+    }
+
+    const { error } = await getSupabaseAdmin()
+      .from('roses_orders')
+      .delete()
+      .eq('id', id)
+
     if (error) throw error
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Suppression des roses impossible :', error)
+    console.error('Suppression de commande impossible :', error)
     return NextResponse.json({ error: 'Impossible de supprimer la commande.' }, { status: 500 })
   }
 }

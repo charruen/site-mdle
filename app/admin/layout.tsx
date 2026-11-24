@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Administrateur — MDLE Jean Perrin',
-  description: 'Panneau de gestion du site de la MDLE',
+  title: 'Administration Roses • MDLE Jean Perrin',
+  description: 'Tableau de bord de gestion et trésorerie des roses de la Saint-Valentin MDLE',
 }
 
 export default function AdminLayout({
