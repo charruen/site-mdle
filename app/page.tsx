@@ -44,7 +44,7 @@ const CLASSES_LIST = [
 ]
 
 export default function StorePage() {
-  // Quantité et couleurs individuelles
+  // Quantité et tableau individuel strict des couleurs
   const [roseCount, setRoseCount] = useState<number>(3)
   const [roseColors, setRoseColors] = useState<RoseColor[]>(['rouge', 'rouge', 'rose'])
 
@@ -52,7 +52,7 @@ export default function StorePage() {
   const [recipientName, setRecipientName] = useState('')
   const [recipientClass, setRecipientClass] = useState('')
 
-  // Mot doux
+  // Mot doux (+0,50 €)
   const [hasMotDoux, setHasMotDoux] = useState(false)
   const [motDouxText, setMotDouxText] = useState('')
 
@@ -60,7 +60,7 @@ export default function StorePage() {
   const [isAnonymous, setIsAnonymous] = useState(true)
   const [senderName, setSenderName] = useState('')
 
-  // Méthode de paiement
+  // Méthode de paiement : 'sumup_online' (Carte Bancaire) ou 'mdle_counter' (Foyer MDLE)
   const [paymentMethod, setPaymentMethod] = useState<'sumup_online' | 'mdle_counter'>('sumup_online')
 
   // État de soumission et modal
@@ -70,16 +70,16 @@ export default function StorePage() {
   const [createdOrder, setCreatedOrder] = useState<OrderResult | null>(null)
   const [paymentDone, setPaymentDone] = useState(false)
 
-  // Calcul du montant total
+  // Calcul déterministe strict côté client
   const redCount = roseColors.filter((c) => c === 'rouge').length
   const pinkCount = roseColors.filter((c) => c === 'rose').length
-  const totalRoses = roseCount
-  const rosesTotal = totalRoses * PRICE_PER_ROSE
+  const totalRoses = roseColors.length // Synchronisation stricte
+  const rosesTotal = (redCount + pinkCount) * PRICE_PER_ROSE
   const motDouxTotal = hasMotDoux ? PRICE_MOT_DOUX : 0
   const grandTotal = rosesTotal + motDouxTotal
   const grandTotalFormatted = grandTotal.toFixed(2).replace('.', ',') + ' €'
 
-  // Gestion de la quantité
+  // Gestion de la quantité avec ajustement strict de roseColors
   const updateCount = (newCount: number) => {
     if (newCount < 1 || newCount > 20) return
     setRoseCount(newCount)
@@ -110,9 +110,14 @@ export default function StorePage() {
     )
   }
 
-  // Ouverture du modal de validation
+  // Ouverture du modal de validation avec contrôles exhaustifs
   const handleOpenCheckout = () => {
     setErrorMessage('')
+
+    if (totalRoses < 1 || totalRoses > 20) {
+      setErrorMessage('Veuillez sélectionner entre 1 et 20 roses.')
+      return
+    }
     if (!recipientName.trim()) {
       setErrorMessage('Veuillez indiquer le nom et prénom du destinataire.')
       const el = document.getElementById('recipient-name')
@@ -125,11 +130,24 @@ export default function StorePage() {
       el?.focus()
       return
     }
+    if (hasMotDoux && !motDouxText.trim()) {
+      setErrorMessage('Veuillez rédiger votre mot doux ou désactivez l’option mot doux.')
+      const el = document.getElementById('mot-doux-text')
+      el?.focus()
+      return
+    }
+    if (!isAnonymous && !senderName.trim()) {
+      setErrorMessage('Veuillez indiquer votre prénom et nom ou cochez l’option anonyme.')
+      const el = document.getElementById('sender-name')
+      el?.focus()
+      return
+    }
+
     setIsModalOpen(true)
   }
 
   // Envoi réel de la commande à l'API
-  const handleConfirmOrder = async (simulateOnlinePayment = false) => {
+  const handleConfirmOrder = async (isOnlineCardPayment = false) => {
     setIsSubmitting(true)
     setErrorMessage('')
 
@@ -143,9 +161,9 @@ export default function StorePage() {
           red_roses_count: redCount,
           pink_roses_count: pinkCount,
           has_message: hasMotDoux,
-          message_text: hasMotDoux ? motDouxText.trim() : null,
+          message_text: hasMotDoux ? motDouxText.trim().slice(0, 200) : null,
           is_anonymous: isAnonymous,
-          sender_name: isAnonymous ? null : senderName.trim(),
+          sender_name: isAnonymous ? null : senderName.trim().slice(0, 100),
           payment_method: paymentMethod,
         }),
       })
@@ -156,16 +174,7 @@ export default function StorePage() {
       }
 
       setCreatedOrder(data.order)
-
-      if (paymentMethod === 'sumup_online' && simulateOnlinePayment) {
-        // Simulation ou validation directe de paiement en ligne
-        setPaymentDone(true)
-      } else if (paymentMethod === 'mdle_counter') {
-        // Enregistrement de la réservation comptoir
-        setPaymentDone(true)
-      } else {
-        setPaymentDone(true)
-      }
+      setPaymentDone(true)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Une erreur inattendue est survenue.'
       setErrorMessage(msg)
@@ -187,6 +196,8 @@ export default function StorePage() {
     setIsAnonymous(true)
     setRoseCount(3)
     setRoseColors(['rouge', 'rouge', 'rose'])
+    setPaymentMethod('sumup_online')
+    setErrorMessage('')
   }
 
   return (
@@ -242,11 +253,11 @@ export default function StorePage() {
       <main className="w-full pt-16 bg-surface min-h-[calc(100vh-80px)]">
         <div className="flex flex-col w-full">
           <div className="relative w-full max-w-[1200px] mx-auto px-margin md:px-margin-desktop py-space-md md:py-space-xl">
-            {/* Subtle Ambient Glow Orbs */}
+            {/* Ambient Glows */}
             <div className="absolute top-10 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none -z-10" />
             <div className="absolute top-48 right-12 w-80 h-80 bg-tertiary-fixed/30 rounded-full blur-3xl pointer-events-none -z-10" />
 
-            {/* Hero Header Banner with MDLE Brand Signature */}
+            {/* Hero Header Banner */}
             <section className="mb-space-xl">
               <div className="bg-surface-container-lowest/80 backdrop-blur-2xl rounded-3xl p-space-lg md:p-space-xl shadow-xl shadow-surface-container-highest/20 relative overflow-hidden">
                 <div className="flex flex-col md:flex-row items-center gap-space-lg md:gap-space-xl">
@@ -305,17 +316,17 @@ export default function StorePage() {
 
             {/* Main Two-Column Workflow */}
             <div id="commander" className="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-start">
-              {/* LEFT COLUMN: Interactive Configuration Flow (8 cols) */}
+              {/* LEFT COLUMN: Configuration Flow (8 cols) */}
               <div className="lg:col-span-8 flex flex-col gap-space-lg">
-                {/* 1. ROSE QUANTITY & COLOR CUSTOMIZER */}
+                {/* 1. NOMBRE & COULEURS DES ROSES */}
                 <section className="bg-surface-container-lowest/90 backdrop-blur-xl rounded-3xl p-space-lg md:p-space-xl shadow-lg shadow-surface-container-highest/15 space-y-space-md">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-space-sm">
-                      <span className="w-8 h-8 rounded-full bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center justify-center">
+                      <span className="w-8 h-8 rounded-full bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center justify-center font-bold">
                         1
                       </span>
                       <div>
-                        <h2 className="font-headline-sm text-headline-sm text-on-surface">
+                        <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">
                           Nombre &amp; Couleurs des Roses
                         </h2>
                         <p className="font-body-sm text-body-sm text-on-surface-variant">
@@ -328,19 +339,19 @@ export default function StorePage() {
                       <button
                         aria-label="Retirer une rose"
                         onClick={() => updateCount(roseCount - 1)}
-                        className="w-9 h-9 rounded-full bg-surface-container-lowest text-on-surface flex items-center justify-center hover:bg-surface-container transition shadow-sm active:scale-95 disabled:opacity-40"
+                        className="w-9 h-9 rounded-full bg-surface-container-lowest text-on-surface flex items-center justify-center hover:bg-surface-container transition shadow-sm active:scale-95 disabled:opacity-40 cursor-pointer"
                         disabled={roseCount <= 1}
                         type="button"
                       >
                         <span className="material-symbols-outlined text-[18px]">remove</span>
                       </button>
-                      <span className="font-headline-md text-headline-md text-on-surface w-8 text-center tabular-nums">
+                      <span className="font-headline-md text-headline-md text-on-surface w-8 text-center tabular-nums font-bold">
                         {roseCount}
                       </span>
                       <button
                         aria-label="Ajouter une rose"
                         onClick={() => updateCount(roseCount + 1)}
-                        className="w-9 h-9 rounded-full bg-surface-container-lowest text-on-surface flex items-center justify-center hover:bg-surface-container transition shadow-sm active:scale-95 disabled:opacity-40"
+                        className="w-9 h-9 rounded-full bg-surface-container-lowest text-on-surface flex items-center justify-center hover:bg-surface-container transition shadow-sm active:scale-95 disabled:opacity-40 cursor-pointer"
                         disabled={roseCount >= 20}
                         type="button"
                       >
@@ -354,21 +365,21 @@ export default function StorePage() {
                     <span className="font-label-sm text-label-sm text-on-surface-variant pr-1">Raccourcis :</span>
                     <button
                       onClick={() => setAllColors('rouge')}
-                      className="px-space-md py-1 rounded-full bg-surface-container-low hover:bg-primary-fixed hover:text-on-primary-fixed font-label-md text-label-md text-on-surface transition active:scale-95"
+                      className="px-space-md py-1 rounded-full bg-surface-container-low hover:bg-primary-fixed hover:text-on-primary-fixed font-label-md text-label-md text-on-surface transition active:scale-95 cursor-pointer font-semibold"
                       type="button"
                     >
                       Toutes Rouges ❤️
                     </button>
                     <button
                       onClick={() => setAllColors('rose')}
-                      className="px-space-md py-1 rounded-full bg-surface-container-low hover:bg-secondary-container hover:text-on-secondary-container font-label-md text-label-md text-on-surface transition active:scale-95"
+                      className="px-space-md py-1 rounded-full bg-surface-container-low hover:bg-pink-100 hover:text-pink-900 font-label-md text-label-md text-on-surface transition active:scale-95 cursor-pointer font-semibold"
                       type="button"
                     >
                       Toutes Roses 🌸
                     </button>
                     <button
                       onClick={setRandomColors}
-                      className="px-space-md py-1 rounded-full bg-surface-container-low hover:bg-tertiary-fixed hover:text-on-tertiary-fixed font-label-md text-label-md text-on-surface transition active:scale-95"
+                      className="px-space-md py-1 rounded-full bg-surface-container-low hover:bg-tertiary-fixed hover:text-on-tertiary-fixed font-label-md text-label-md text-on-surface transition active:scale-95 cursor-pointer font-semibold"
                       type="button"
                     >
                       Mélange Aléatoire ✨
@@ -396,7 +407,7 @@ export default function StorePage() {
                           <button
                             type="button"
                             onClick={() => setColorAt(idx, 'rouge')}
-                            className={`py-1.5 rounded-lg font-label-sm text-label-sm flex items-center justify-center gap-1 transition ${
+                            className={`py-1.5 rounded-lg font-label-sm text-label-sm flex items-center justify-center gap-1 transition cursor-pointer ${
                               color === 'rouge'
                                 ? 'bg-primary text-on-primary font-bold shadow-sm'
                                 : 'text-on-surface-variant hover:text-on-surface'
@@ -408,7 +419,7 @@ export default function StorePage() {
                           <button
                             type="button"
                             onClick={() => setColorAt(idx, 'rose')}
-                            className={`py-1.5 rounded-lg font-label-sm text-label-sm flex items-center justify-center gap-1 transition ${
+                            className={`py-1.5 rounded-lg font-label-sm text-label-sm flex items-center justify-center gap-1 transition cursor-pointer ${
                               color === 'rose'
                                 ? 'bg-pink-600 text-white font-bold shadow-sm'
                                 : 'text-on-surface-variant hover:text-on-surface'
@@ -423,14 +434,14 @@ export default function StorePage() {
                   </div>
                 </section>
 
-                {/* 2. RECIPIENT INFORMATION (Destinataire) */}
+                {/* 2. RECIPIENT INFORMATION */}
                 <section className="bg-surface-container-lowest/90 backdrop-blur-xl rounded-3xl p-space-lg md:p-space-xl shadow-lg shadow-surface-container-highest/15 space-y-space-md">
                   <div className="flex items-center gap-space-sm">
-                    <span className="w-8 h-8 rounded-full bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center justify-center">
+                    <span className="w-8 h-8 rounded-full bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center justify-center font-bold">
                       2
                     </span>
                     <div>
-                      <h2 className="font-headline-sm text-headline-sm text-on-surface">
+                      <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">
                         Destinataire &amp; Classe
                       </h2>
                       <p className="font-body-sm text-body-sm text-on-surface-variant">
@@ -441,7 +452,7 @@ export default function StorePage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md pt-space-xs">
                     {/* Nom et prénom */}
                     <div className="flex flex-col gap-space-xs">
-                      <label className="font-label-md text-label-md text-on-surface flex items-center gap-1" htmlFor="recipient-name">
+                      <label className="font-label-md text-label-md text-on-surface flex items-center gap-1 font-semibold" htmlFor="recipient-name">
                         <span>Nom &amp; Prénom du destinataire</span>
                         <span className="text-primary">*</span>
                       </label>
@@ -462,7 +473,7 @@ export default function StorePage() {
                     </div>
                     {/* Classe ou statut */}
                     <div className="flex flex-col gap-space-xs">
-                      <label className="font-label-md text-label-md text-on-surface flex items-center gap-1" htmlFor="recipient-class">
+                      <label className="font-label-md text-label-md text-on-surface flex items-center gap-1 font-semibold" htmlFor="recipient-class">
                         <span>Classe / Salle</span>
                         <span className="text-primary">*</span>
                       </label>
@@ -499,14 +510,14 @@ export default function StorePage() {
                   </div>
                 </section>
 
-                {/* 3. CUSTOM MESSAGE ("Mot Doux") & ANONYMITY */}
+                {/* 3. MESSAGE & ANONYMAT */}
                 <section className="bg-surface-container-lowest/90 backdrop-blur-xl rounded-3xl p-space-lg md:p-space-xl shadow-lg shadow-surface-container-highest/15 space-y-space-md">
                   <div className="flex items-center gap-space-sm">
-                    <span className="w-8 h-8 rounded-full bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center justify-center">
+                    <span className="w-8 h-8 rounded-full bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center justify-center font-bold">
                       3
                     </span>
                     <div>
-                      <h2 className="font-headline-sm text-headline-sm text-on-surface">
+                      <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">
                         Message Calligraphié &amp; Anonymat
                       </h2>
                       <p className="font-body-sm text-body-sm text-on-surface-variant">
@@ -530,7 +541,7 @@ export default function StorePage() {
                         </div>
                       </div>
                     </div>
-                    {/* Custom Toggle */}
+                    {/* Toggle */}
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
                         id="toggle-mot-doux"
@@ -614,7 +625,7 @@ export default function StorePage() {
                         <input
                           id="sender-name"
                           value={senderName}
-                          onChange={(e) => setSenderName(e.target.value)}
+                          onChange={(e) => setSenderName(e.target.value.slice(0, 100))}
                           className="w-full bg-surface-container-lowest text-on-surface rounded-xl px-space-md py-2.5 font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary shadow-inner"
                           placeholder="ex. Thomas Roux (T°3)"
                           type="text"
@@ -624,21 +635,21 @@ export default function StorePage() {
                   </div>
                 </section>
 
-                {/* 4. PAYMENT METHOD SELECTOR */}
+                {/* 4. MODE DE RÈGLEMENT (100% SumUp CB ou Foyer MDLE) */}
                 <section className="bg-surface-container-lowest/90 backdrop-blur-xl rounded-3xl p-space-lg md:p-space-xl shadow-lg shadow-surface-container-highest/15 space-y-space-md">
                   <div className="flex items-center gap-space-sm">
-                    <span className="w-8 h-8 rounded-full bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center justify-center">
+                    <span className="w-8 h-8 rounded-full bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center justify-center font-bold">
                       4
                     </span>
                     <div>
-                      <h2 className="font-headline-sm text-headline-sm text-on-surface">Mode de Règlement</h2>
+                      <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">Mode de Règlement</h2>
                       <p className="font-body-sm text-body-sm text-on-surface-variant">
-                        Directement en ligne ou au foyer du lycée
+                        Directement en ligne par Carte Bancaire ou en espèces au foyer
                       </p>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md pt-space-xs">
-                    {/* Method 1: SumUp Online */}
+                    {/* Method 1: SumUp Online (Carte Bancaire) */}
                     <div
                       onClick={() => setPaymentMethod('sumup_online')}
                       className={`cursor-pointer rounded-2xl p-space-md transition-all relative block shadow-sm hover:shadow-md ${
@@ -649,9 +660,9 @@ export default function StorePage() {
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-space-sm">
-                          <span className="material-symbols-outlined text-primary text-[24px]">contactless</span>
+                          <span className="material-symbols-outlined text-primary text-[24px]">credit_card</span>
                           <div className="font-headline-sm text-headline-sm text-on-surface font-bold">
-                            En ligne sécurisé
+                            Carte Bancaire en ligne
                           </div>
                         </div>
                         <input
@@ -664,20 +675,17 @@ export default function StorePage() {
                         />
                       </div>
                       <p className="font-body-sm text-body-sm text-on-surface-variant mt-space-sm">
-                        Paiement instantané certifié par <strong>SumUp</strong>. Validation immédiate de votre commande.
+                        Paiement sécurisé par <strong>Carte Bancaire</strong> via la passerelle certifiée <strong>SumUp</strong>. Validation immédiate de votre commande.
                       </p>
                       <div className="flex items-center gap-space-xs mt-space-sm flex-wrap">
                         <span className="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm text-on-surface shadow-xs font-semibold">
-                          Apple Pay
-                        </span>
-                        <span className="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm text-on-surface shadow-xs font-semibold">
-                          Google Pay
-                        </span>
-                        <span className="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm text-on-surface shadow-xs font-semibold">
-                          CB
+                          Carte Bancaire
                         </span>
                         <span className="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm text-on-surface shadow-xs font-semibold">
                           Visa
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm text-on-surface shadow-xs font-semibold">
+                          Mastercard
                         </span>
                       </div>
                     </div>
@@ -723,9 +731,8 @@ export default function StorePage() {
                 </section>
               </div>
 
-              {/* RIGHT COLUMN: Sticky Live Order Summary & Apple-style CTA (4 cols) */}
+              {/* RIGHT COLUMN: Sticky Live Order Summary (4 cols) */}
               <aside className="lg:col-span-4 sticky top-20 flex flex-col gap-space-md">
-                {/* Summary Box */}
                 <div className="bg-surface-container-lowest/95 backdrop-blur-2xl rounded-3xl p-space-lg shadow-xl shadow-surface-container-highest/20 space-y-space-md">
                   <div className="flex items-center justify-between pb-space-sm">
                     <div className="flex items-center gap-space-xs">
@@ -737,18 +744,18 @@ export default function StorePage() {
                     </span>
                   </div>
 
-                  {/* Detailed dynamic breakdown */}
+                  {/* Detailed breakdown */}
                   <div className="space-y-space-sm font-body-md text-body-md">
                     <div className="flex items-center justify-between text-on-surface">
                       <span>
                         {totalRoses}x Rose{totalRoses > 1 ? 's' : ''} fraîche{totalRoses > 1 ? 's' : ''}
                       </span>
                       <span className="font-semibold tabular-nums">
-                        {(totalRoses * PRICE_PER_ROSE).toFixed(2).replace('.', ',')} €
+                        {rosesTotal.toFixed(2).replace('.', ',')} €
                       </span>
                     </div>
 
-                    {/* Color mini chips in summary */}
+                    {/* Color badges */}
                     <div className="flex flex-wrap gap-1 pb-1">
                       {redCount > 0 && (
                         <span className="px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm font-semibold">
@@ -805,12 +812,12 @@ export default function StorePage() {
                     </span>
                     <span>
                       {paymentMethod === 'sumup_online'
-                        ? `Commander et payer (${grandTotalFormatted})`
+                        ? `Commander et payer par CB (${grandTotalFormatted})`
                         : `Réserver sans payer (${grandTotalFormatted})`}
                     </span>
                   </button>
 
-                  {/* Safe badges & MDLE Guarantee */}
+                  {/* Badges Guarantee */}
                   <div className="text-center space-y-1 pt-space-xs">
                     <p className="font-body-sm text-body-sm text-on-surface-variant flex items-center justify-center gap-1">
                       <span className="material-symbols-outlined text-[16px] text-primary">verified_user</span>
@@ -832,7 +839,7 @@ export default function StorePage() {
               </aside>
             </div>
 
-            {/* Minimal Discreet Admin Access at the bottom */}
+            {/* Admin access button */}
             <div className="mt-space-xl pt-space-lg text-center">
               <a
                 href="/admin"
@@ -849,6 +856,7 @@ export default function StorePage() {
       {/* SUMUP / CHECKOUT POPUP MODAL */}
       {isModalOpen && (
         <div
+          id="checkout-modal"
           className="fixed inset-0 z-50 flex items-center justify-center p-space-md bg-inverse-surface/60 backdrop-blur-md animate-in fade-in duration-200"
           onClick={(e) => {
             if (e.target === e.currentTarget && !isSubmitting) setIsModalOpen(false)
@@ -859,7 +867,7 @@ export default function StorePage() {
             {!isSubmitting && (
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="absolute top-5 right-5 w-8 h-8 rounded-full bg-surface-container text-on-surface flex items-center justify-center hover:bg-surface-container-high transition"
+                className="absolute top-5 right-5 w-8 h-8 rounded-full bg-surface-container text-on-surface flex items-center justify-center hover:bg-surface-container-high transition cursor-pointer"
                 type="button"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
@@ -908,30 +916,23 @@ export default function StorePage() {
                   </div>
                 </div>
 
-                {/* Dynamic actions according to selected payment method */}
+                {/* Actions : 100% Carte Bancaire SumUp ou Comptoir MDLE */}
                 {paymentMethod === 'sumup_online' ? (
                   <div className="space-y-space-sm">
                     <button
                       onClick={() => handleConfirmOrder(true)}
                       disabled={isSubmitting}
-                      className="w-full py-3.5 px-space-md rounded-2xl bg-black text-white font-label-lg text-label-lg flex items-center justify-center gap-2 hover:opacity-90 transition active:scale-98 cursor-pointer disabled:opacity-50"
-                      type="button"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">contactless</span>
-                      <span>
-                        {isSubmitting ? 'Traitement en cours...' : 'Payer avec '}
-                        <strong>Apple Pay / Google Pay</strong>
-                      </span>
-                    </button>
-                    <button
-                      onClick={() => handleConfirmOrder(true)}
-                      disabled={isSubmitting}
-                      className="w-full py-3 px-space-md rounded-2xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-lg text-label-lg flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
+                      className="w-full py-3.5 px-space-md rounded-2xl bg-primary text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 hover:bg-primary-container transition active:scale-98 cursor-pointer disabled:opacity-50 font-bold shadow-md"
                       type="button"
                     >
                       <span className="material-symbols-outlined text-[20px]">credit_card</span>
-                      <span>Carte Bancaire (Passerelle SumUp)</span>
+                      <span>
+                        {isSubmitting ? 'Connexion sécurisée SumUp...' : 'Payer par Carte Bancaire (SumUp)'}
+                      </span>
                     </button>
+                    <p className="text-center font-body-sm text-[11px] text-on-surface-variant">
+                      Paiement direct sécurisé par Carte Bancaire (CB, Visa, Mastercard)
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-space-sm text-center">
@@ -947,7 +948,7 @@ export default function StorePage() {
                     <button
                       onClick={() => handleConfirmOrder(false)}
                       disabled={isSubmitting}
-                      className="w-full py-3.5 px-space-md rounded-2xl bg-primary text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 hover:bg-primary-container transition active:scale-98 cursor-pointer disabled:opacity-50 font-bold"
+                      className="w-full py-3.5 px-space-md rounded-2xl bg-primary text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 hover:bg-primary-container transition active:scale-98 cursor-pointer disabled:opacity-50 font-bold shadow-md"
                       type="button"
                     >
                       <span className="material-symbols-outlined text-[20px]">task_alt</span>
@@ -977,13 +978,13 @@ export default function StorePage() {
                 )}
                 <p className="font-body-md text-body-md text-on-surface-variant max-w-xs mx-auto">
                   {paymentMethod === 'sumup_online'
-                    ? 'Merci pour votre paiement en ligne ! La livraison aura lieu discrètement en classe le vendredi 14 février 2025.'
+                    ? 'Merci pour votre règlement par Carte Bancaire via SumUp ! La livraison aura lieu discrètement en classe le vendredi 14 février 2025.'
                     : 'Votre réservation est validée ! N’oubliez pas de passer au Foyer MDLE régler votre commande avant le 13 février 17h.'}
                 </p>
                 <div className="pt-space-md">
                   <button
                     onClick={handleResetForm}
-                    className="w-full py-3 px-space-xl rounded-full bg-primary hover:bg-primary-container text-on-primary font-label-md text-label-md transition font-bold"
+                    className="w-full py-3 px-space-xl rounded-full bg-primary hover:bg-primary-container text-on-primary font-label-md text-label-md transition font-bold cursor-pointer"
                     type="button"
                   >
                     Passer une autre commande

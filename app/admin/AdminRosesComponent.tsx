@@ -747,7 +747,7 @@ export default function AdminRosesComponent() {
                         : 'text-on-surface-variant hover:text-on-surface'
                     }`}
                   >
-                    Payées ({orders.filter((o) => o.payment_status === 'paid').length})
+                    Payées SumUp ({orders.filter((o) => o.payment_status === 'paid').length})
                   </button>
                   <button
                     onClick={() => setActiveFilter('pending')}
