@@ -30,7 +30,6 @@ import {
   SALES_END,
   DELIVERY_DATE_LABEL,
   COUNTER_CLOSING_LABEL,
-  COUNTER_HOURS,
   COUNTER_LOCATION,
   PRICE_PER_ROSE,
   PRICE_MOT_DOUX,
@@ -834,7 +833,7 @@ export default function HomePage() {
                 <CreditCard className="w-4 h-4" /> Comment régler sa commande ?
               </h4>
               <p className="text-xs text-[#565e74] leading-relaxed">
-                Deux options au choix : soit directement par <strong>Carte Bancaire en ligne</strong> via la plateforme sécurisée SumUp, soit en <strong>espèces ou carte au Foyer MDLE</strong> ({COUNTER_LOCATION}) aux récréations et le midi ({COUNTER_HOURS}).
+                Deux options au choix : soit directement par <strong>Carte Bancaire en ligne</strong> via la plateforme sécurisée SumUp, soit en <strong>espèces ou carte au {COUNTER_LOCATION}</strong>.
               </p>
             </div>
 

@@ -2,7 +2,6 @@ import nodemailer from 'nodemailer'
 import {
   CONTACT_EMAIL,
   COUNTER_CLOSING_LABEL,
-  COUNTER_HOURS,
   COUNTER_LOCATION,
   DELIVERY_DATE_LABEL,
   EDITION_YEAR,
@@ -154,8 +153,7 @@ export async function sendOrderConfirmationEmail(order: OrderEmailData): Promise
           ${
             isCounter
               ? `<p style="margin: 0; font-size: 14px; line-height: 1.5;">
-                  Ta commande est réservée ! Pour la valider définitivement, viens régler <strong>${order.total_amount.toFixed(2)} €</strong> au Foyer MDLE (${COUNTER_LOCATION}) :<br>
-                  • Horaires : ${COUNTER_HOURS}<br>
+                  Ta commande est réservée ! Pour la valider définitivement, viens régler <strong>${order.total_amount.toFixed(2)} €</strong> au ${COUNTER_LOCATION} :<br>
                   • <strong>Date limite impérative : ${COUNTER_CLOSING_LABEL}</strong>.<br>
                   <span style="color: #ba1a1a; font-weight: 600;">Pense à indiquer ta référence #${shortId} et ton nom lors du paiement.</span>
                 </p>`
@@ -249,7 +247,7 @@ export async function sendReminderEmail(order: OrderEmailData, daysRemaining: nu
           ${
             isCounter
               ? `<p style="margin: 0; font-size: 14px;">
-                  Passe au <strong>Foyer MDLE</strong> (${COUNTER_HOURS}) avec ta référence <strong>#${shortId}</strong> avant <strong>${COUNTER_CLOSING_LABEL}</strong>.
+                  Passe au <strong>${COUNTER_LOCATION}</strong> avec ta référence <strong>#${shortId}</strong> avant <strong>${COUNTER_CLOSING_LABEL}</strong>.
                 </p>`
               : `<p style="margin: 0; font-size: 14px;">
                   Rends-toi sur le site de la MDLE pour finaliser ton règlement par carte bancaire sécurisée.
