@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 
 async function checkAdmin() {
   if (!(await isAdminAuthenticated())) {
-    return NextResponse.json({ error: 'Session non autorisée.' }, { status: 401 })
+    return NextResponse.json({ error: 'Session non autorisée ou expirée.' }, { status: 401 })
   }
   return null
 }
@@ -34,9 +34,14 @@ export async function PATCH(request: Request) {
   if (unauthorized) return unauthorized
 
   try {
-    const body = (await request.json()) as {
+    const body = (await request.json().catch(() => ({}))) as {
       id?: string
       payment_status?: string
+      delivered?: boolean
+      recipient_name?: string
+      recipient_class?: string
+      message_text?: string | null
+      reminders_opt_out?: boolean
     }
 
     const id = (body.id || '').trim()
@@ -44,15 +49,55 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Identifiant de commande manquant.' }, { status: 400 })
     }
 
-    const payment_status = body.payment_status === 'paid' ? 'paid' : 'pending'
+    const updates: Record<string, unknown> = {}
 
-    const { error } = await getSupabaseAdmin()
+    // Statut de paiement
+    if (body.payment_status !== undefined) {
+      if (['paid', 'pending', 'expired'].includes(body.payment_status)) {
+        updates.payment_status = body.payment_status
+      }
+    }
+
+    // Statut de livraison en classe
+    if (body.delivered !== undefined) {
+      updates.delivered = Boolean(body.delivered)
+      updates.delivered_at = body.delivered ? new Date().toISOString() : null
+    }
+
+    // Modification d'informations par l'admin
+    if (body.recipient_name !== undefined) {
+      const trimmed = body.recipient_name.trim().slice(0, 100)
+      if (trimmed) updates.recipient_name = trimmed
+    }
+
+    if (body.recipient_class !== undefined) {
+      const trimmed = body.recipient_class.trim().slice(0, 50)
+      if (trimmed) updates.recipient_class = trimmed
+    }
+
+    if (body.message_text !== undefined) {
+      const trimmed = (body.message_text || '').trim().slice(0, 200)
+      updates.message_text = trimmed || null
+      updates.has_message = Boolean(trimmed)
+    }
+
+    if (body.reminders_opt_out !== undefined) {
+      updates.reminders_opt_out = Boolean(body.reminders_opt_out)
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'Aucune modification spécifiée.' }, { status: 400 })
+    }
+
+    const { data: updatedOrder, error } = await getSupabaseAdmin()
       .from('roses_orders')
-      .update({ payment_status })
+      .update(updates)
       .eq('id', id)
+      .select('*')
+      .single()
 
     if (error) throw error
-    return NextResponse.json({ success: true, payment_status })
+    return NextResponse.json({ success: true, order: updatedOrder })
   } catch (error) {
     console.error('Mise à jour commande impossible :', error)
     return NextResponse.json({ error: 'Impossible de mettre à jour la commande.' }, { status: 500 })

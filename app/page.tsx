@@ -1,155 +1,224 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import Image from 'next/image'
+import Link from 'next/link'
+import {
+  Heart,
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  CreditCard,
+  Coins,
+  Send,
+  Lock,
+  ShieldCheck,
+  HelpCircle,
+  X,
+  ChevronDown,
+  Calendar,
+  MapPin,
+  User,
+  Mail,
+  ExternalLink,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react'
+import {
+  EDITION_YEAR,
+  SALES_START,
+  SALES_END,
+  DELIVERY_DATE_LABEL,
+  COUNTER_CLOSING_LABEL,
+  COUNTER_HOURS,
+  COUNTER_LOCATION,
+  PRICE_PER_ROSE,
+  PRICE_MOT_DOUX,
+  MAX_ROSES,
+  OFFICIAL_CLASSES,
+  CONTACT_EMAIL,
+  MDLE_INSTAGRAM,
+  isSalesOpen,
+  isBeforeSales,
+  isSalesClosed,
+  isCounterOpen,
+  getTimeRemaining,
+} from '@/lib/config'
 
-type RoseColor = 'rouge' | 'rose'
-
-type OrderResult = {
+type CreatedOrder = {
   id: string
-  created_at: string
+  total_amount: number
+  payment_method: 'sumup_online' | 'mdle_counter'
+  payment_status: string
   recipient_name: string
   recipient_class: string
   red_roses_count: number
   pink_roses_count: number
   has_message: boolean
-  message_text: string | null
-  is_anonymous: boolean
-  sender_name: string | null
-  total_amount: number
-  payment_method: 'sumup_online' | 'mdle_counter'
-  payment_status: 'pending' | 'paid'
-  sumup_checkout_id: string | null
+  created_at: string
+  sumup_checkout_id?: string | null
 }
 
-const PRICE_PER_ROSE = 2.00
-const PRICE_MOT_DOUX = 0.50
+export default function HomePage() {
+  // Quantités
+  const [redCount, setRedCount] = useState(1)
+  const [pinkCount, setPinkCount] = useState(0)
 
-const CLASSES_LIST = [
-  'Seconde 1',
-  'Seconde 2',
-  'Seconde 3',
-  'Seconde 4',
-  'Seconde 5',
-  'Première 1',
-  'Première 2',
-  'Première 3',
-  'Première 4 - HGGSP',
-  'Terminale 1 - Maths',
-  'Terminale 2',
-  'Terminale 3 - SES',
-  'Terminale 4',
-  'Salle des Professeurs',
-  'Vie Scolaire',
-  'Secrétariat / CDI',
-]
+  // Mot doux
+  const [hasMessage, setHasMessage] = useState(false)
+  const [messageText, setMessageText] = useState('')
 
-export default function StorePage() {
-  // Quantité et tableau individuel strict des couleurs
-  const [roseCount, setRoseCount] = useState<number>(3)
-  const [roseColors, setRoseColors] = useState<RoseColor[]>(['rouge', 'rouge', 'rose'])
-
-  // Informations destinataire
+  // Destinataire
   const [recipientName, setRecipientName] = useState('')
-  const [recipientClass, setRecipientClass] = useState('')
+  const [recipientClass, setRecipientClass] = useState<string>(OFFICIAL_CLASSES[0])
+  const [customClass, setCustomClass] = useState('')
 
-  // Mot doux (+0,50 €)
-  const [hasMotDoux, setHasMotDoux] = useState(false)
-  const [motDouxText, setMotDouxText] = useState('')
-
-  // Anonymat & expéditeur
-  const [isAnonymous, setIsAnonymous] = useState(true)
+  // Expéditeur
   const [senderName, setSenderName] = useState('')
+  const [senderEmail, setSenderEmail] = useState('')
+  const [isAnonymous, setIsAnonymous] = useState(false)
 
-  // Méthode de paiement : 'sumup_online' (Carte Bancaire) ou 'mdle_counter' (Foyer MDLE)
+  // Règlement
   const [paymentMethod, setPaymentMethod] = useState<'sumup_online' | 'mdle_counter'>('sumup_online')
 
-  // État de soumission et modal
+  // Honeypot anti-spam
+  const [honeypot, setHoneypot] = useState('')
+
+  // États UI
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [createdOrder, setCreatedOrder] = useState<OrderResult | null>(null)
-  const [paymentDone, setPaymentDone] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [activeModal, setActiveModal] = useState<'none' | 'error' | 'success'>('none')
+  const [createdOrder, setCreatedOrder] = useState<CreatedOrder | null>(null)
+  const [paymentCheckStatus, setPaymentCheckStatus] = useState<string>('pending')
+  const [isCheckingPayment, setIsCheckingPayment] = useState(false)
 
-  // Calcul déterministe strict côté client
-  const redCount = roseColors.filter((c) => c === 'rouge').length
-  const pinkCount = roseColors.filter((c) => c === 'rose').length
-  const totalRoses = roseColors.length // Synchronisation stricte
-  const rosesTotal = (redCount + pinkCount) * PRICE_PER_ROSE
-  const motDouxTotal = hasMotDoux ? PRICE_MOT_DOUX : 0
-  const grandTotal = rosesTotal + motDouxTotal
-  const grandTotalFormatted = grandTotal.toFixed(2).replace('.', ',') + ' €'
+  // Compte à rebours temps réel
+  const [now, setNow] = useState<Date>(new Date())
 
-  // Gestion de la quantité avec ajustement strict de roseColors
-  const updateCount = (newCount: number) => {
-    if (newCount < 1 || newCount > 20) return
-    setRoseCount(newCount)
-    if (newCount > roseColors.length) {
-      const added: RoseColor[] = Array.from(
-        { length: newCount - roseColors.length },
-        (_, i) => ((roseColors.length + i) % 2 === 0 ? 'rouge' : 'rose')
-      )
-      setRoseColors([...roseColors, ...added])
-    } else {
-      setRoseColors(roseColors.slice(0, newCount))
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  const salesAreOpen = isSalesOpen(now)
+  const beforeSales = isBeforeSales(now)
+  const salesClosed = isSalesClosed(now)
+  const counterIsOpen = isCounterOpen(now)
+
+  // Détermination du mode de règlement effectif
+  const effectivePaymentMethod = (!counterIsOpen && paymentMethod === 'mdle_counter') ? 'sumup_online' : paymentMethod
+
+  // Calculs
+  const totalRoses = redCount + pinkCount
+  const totalAmount = Number(((totalRoses * PRICE_PER_ROSE) + (hasMessage ? PRICE_MOT_DOUX : 0)).toFixed(2))
+
+  // Compte à rebours
+  const targetForCountdown = beforeSales ? SALES_START : SALES_END
+  const remaining = getTimeRemaining(targetForCountdown, now)
+
+  // Gestion des touches pour la modale accessible (Echap)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && activeModal !== 'none') {
+        setActiveModal('none')
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [activeModal])
+
+  // Vérification périodique du statut SumUp quand la modale de succès est ouverte
+  useEffect(() => {
+    let pollInterval: NodeJS.Timeout | null = null
+
+    if (activeModal === 'success' && createdOrder?.payment_method === 'sumup_online' && paymentCheckStatus !== 'paid') {
+      pollInterval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/orders/${createdOrder.id}/status`)
+          if (res.ok) {
+            const data = await res.json()
+            if (data.payment_status === 'paid') {
+              setPaymentCheckStatus('paid')
+            }
+          }
+        } catch {
+          // Erreur réseau ignorée en arrière-plan
+        }
+      }, 5000)
+    }
+
+    return () => {
+      if (pollInterval) clearInterval(pollInterval)
+    }
+  }, [activeModal, createdOrder, paymentCheckStatus])
+
+  async function checkManualPaymentStatus() {
+    if (!createdOrder) return
+    setIsCheckingPayment(true)
+    try {
+      const res = await fetch(`/api/orders/${createdOrder.id}/status`)
+      if (res.ok) {
+        const data = await res.json()
+        setPaymentCheckStatus(data.payment_status)
+      }
+    } catch {
+      // Ignoré
+    } finally {
+      setIsCheckingPayment(false)
     }
   }
 
-  const setColorAt = (index: number, color: RoseColor) => {
-    const updated = [...roseColors]
-    updated[index] = color
-    setRoseColors(updated)
-  }
+  // Soumission du formulaire
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
 
-  const setAllColors = (color: RoseColor) => {
-    setRoseColors(Array(roseCount).fill(color))
-  }
-
-  const setRandomColors = () => {
-    setRoseColors(
-      Array.from({ length: roseCount }, () => (Math.random() > 0.5 ? 'rouge' : 'rose'))
-    )
-  }
-
-  // Ouverture du modal de validation avec contrôles exhaustifs
-  const handleOpenCheckout = () => {
-    setErrorMessage('')
-
-    if (totalRoses < 1 || totalRoses > 20) {
-      setErrorMessage('Veuillez sélectionner entre 1 et 20 roses.')
+    if (!salesAreOpen) {
+      setErrorMessage('La boutique n&apos;est pas ouverte aux commandes actuellement.')
+      setActiveModal('error')
       return
     }
+
+    if (totalRoses < 1) {
+      setErrorMessage('Veuillez sélectionner au moins une rose.')
+      setActiveModal('error')
+      return
+    }
+
+    if (totalRoses > MAX_ROSES) {
+      setErrorMessage(`Le maximum est de ${MAX_ROSES} roses par commande.`)
+      setActiveModal('error')
+      return
+    }
+
     if (!recipientName.trim()) {
-      setErrorMessage('Veuillez indiquer le nom et prénom du destinataire.')
-      const el = document.getElementById('recipient-name')
-      el?.focus()
-      return
-    }
-    if (!recipientClass.trim()) {
-      setErrorMessage('Veuillez indiquer la classe ou la salle du destinataire.')
-      const el = document.getElementById('recipient-class')
-      el?.focus()
-      return
-    }
-    if (hasMotDoux && !motDouxText.trim()) {
-      setErrorMessage('Veuillez rédiger votre mot doux ou désactivez l’option mot doux.')
-      const el = document.getElementById('mot-doux-text')
-      el?.focus()
-      return
-    }
-    if (!isAnonymous && !senderName.trim()) {
-      setErrorMessage('Veuillez indiquer votre prénom et nom ou cochez l’option anonyme.')
-      const el = document.getElementById('sender-name')
-      el?.focus()
+      setErrorMessage('Veuillez renseigner le nom et prénom du destinataire.')
+      setActiveModal('error')
       return
     }
 
-    setIsModalOpen(true)
-  }
+    const effectiveClass = recipientClass === 'Autre' ? customClass.trim() : recipientClass
+    if (!effectiveClass) {
+      setErrorMessage('Veuillez préciser la classe du destinataire.')
+      setActiveModal('error')
+      return
+    }
 
-  // Envoi réel de la commande à l'API
-  const handleConfirmOrder = async (isOnlineCardPayment = false) => {
+    if (!senderName.trim()) {
+      setErrorMessage('Veuillez renseigner votre prénom et nom.')
+      setActiveModal('error')
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!senderEmail.trim() || !emailRegex.test(senderEmail.trim())) {
+      setErrorMessage('Veuillez renseigner une adresse e-mail valide pour recevoir votre confirmation.')
+      setActiveModal('error')
+      return
+    }
+
     setIsSubmitting(true)
-    setErrorMessage('')
+    setErrorMessage(null)
 
     try {
       const res = await fetch('/api/orders', {
@@ -157,868 +226,859 @@ export default function StorePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           recipient_name: recipientName.trim(),
-          recipient_class: recipientClass.trim(),
+          recipient_class: effectiveClass,
           red_roses_count: redCount,
           pink_roses_count: pinkCount,
-          has_message: hasMotDoux,
-          message_text: hasMotDoux ? motDouxText.trim().slice(0, 200) : null,
+          has_message: hasMessage,
+          message_text: hasMessage ? messageText.trim() : null,
           is_anonymous: isAnonymous,
-          sender_name: isAnonymous ? null : senderName.trim().slice(0, 100),
-          payment_method: paymentMethod,
+          sender_name: senderName.trim(),
+          sender_email: senderEmail.trim(),
+          payment_method: effectivePaymentMethod,
+          website: honeypot, // Champ anti-spam
         }),
       })
 
       const data = await res.json()
+
       if (!res.ok) {
-        throw new Error(data.error || 'Erreur lors de l’enregistrement de la commande.')
+        throw new Error(data.error || 'Une erreur est survenue lors de l’enregistrement de votre commande.')
       }
 
       setCreatedOrder(data.order)
-      setPaymentDone(true)
+      setPaymentCheckStatus(data.order.payment_status || 'pending')
+      setActiveModal('success')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Une erreur inattendue est survenue.'
       setErrorMessage(msg)
-      alert(msg)
+      setActiveModal('error')
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const handleResetForm = () => {
-    setIsModalOpen(false)
-    setPaymentDone(false)
-    setCreatedOrder(null)
-    setRecipientName('')
-    setRecipientClass('')
-    setMotDouxText('')
-    setHasMotDoux(false)
-    setSenderName('')
-    setIsAnonymous(true)
-    setRoseCount(3)
-    setRoseColors(['rouge', 'rouge', 'rose'])
-    setPaymentMethod('sumup_online')
-    setErrorMessage('')
-  }
-
   return (
-    <div className="bg-surface font-body-md text-on-surface antialiased selection:bg-primary-fixed selection:text-on-primary-fixed min-h-screen">
-      {/* Header */}
-      <header className="fixed top-0 w-full z-50 bg-surface-container-lowest/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
-        <div className="h-16 max-w-[1200px] mx-auto px-4 md:px-margin-desktop flex items-center justify-between">
-          <div className="flex items-center gap-space-md">
-            <div className="flex items-center gap-space-sm">
-              <span className="font-headline-sm text-headline-sm text-primary">MDLE</span>
-              <span className="font-body-sm text-body-sm text-on-surface-variant font-medium hidden sm:inline-block">•</span>
-              <span className="font-body-md text-body-md text-on-surface-variant hidden sm:inline-block">Lycée Jean Perrin</span>
+    <div className="min-h-screen flex flex-col bg-[#FFF8F7] text-[#231919]">
+      {/* En-tête / Bannière officielle */}
+      <header className="bg-white border-b border-[#F6DEDC] sticky top-0 z-30 shadow-xs">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="relative w-10 h-10 rounded-full overflow-hidden border border-[#F6DEDC] bg-[#FFF0EF] flex items-center justify-center shrink-0">
+              <Image
+                src="/logo-mdle.png"
+                alt="Logo MDLE"
+                width={40}
+                height={40}
+                className="object-contain"
+                priority
+              />
             </div>
-            <span className="hidden lg:inline-flex items-center px-space-sm py-space-xs rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm uppercase tracking-wider">
-              Opération Saint-Valentin
-            </span>
+            <div>
+              <span className="text-xs uppercase tracking-wider font-bold text-[#b7102a] block">
+                Maison Des Lycéens • Jean Perrin
+              </span>
+              <h1 className="text-base sm:text-lg font-bold text-[#231919] leading-tight flex items-center gap-1.5">
+                Saint-Valentin {EDITION_YEAR}
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-[#FFF0EF] text-[#b7102a]">
+                  Officiel
+                </span>
+              </h1>
+            </div>
           </div>
-          <nav className="flex items-center gap-space-xs p-space-xs rounded-full bg-surface-container-low/60">
+
+          <div className="flex items-center gap-3">
             <a
-              href="#commander"
-              className="px-space-md py-space-xs font-label-md transition-colors bg-primary text-on-primary rounded-full shadow-sm"
+              href="#operation"
+              className="hidden sm:inline-flex items-center gap-1 text-xs font-semibold text-[#565e74] hover:text-[#b7102a] transition-colors"
             >
-              Commander
+              <HelpCircle className="w-4 h-4" />
+              L’opération &amp; FAQ
             </a>
-            <a
-              href="#faq"
-              className="px-space-md py-space-xs rounded-full font-label-md text-label-md text-on-surface-variant transition-colors hover:text-on-surface"
-            >
-              L&apos;Opération
-            </a>
-            <a
+            <Link
               href="/admin"
-              className="px-space-md py-space-xs rounded-full font-label-md text-label-md text-on-surface-variant transition-colors hover:text-on-surface flex items-center gap-1"
+              className="text-xs font-medium text-[#565e74] hover:text-[#b7102a] px-2.5 py-1.5 rounded-lg hover:bg-[#FFF0EF] transition-colors"
             >
-              <span className="material-symbols-outlined text-[15px]">lock</span>
-              <span>Bureau</span>
-            </a>
-          </nav>
-          <div className="flex items-center gap-space-md">
-            <span className="hidden md:inline-block font-label-sm text-label-sm text-tertiary-container bg-tertiary-fixed px-space-sm py-space-xs rounded-full font-semibold">
-              14 Fév. 2025
-            </span>
-            <img
-              alt="Logo MDLE"
-              className="w-8 h-8 rounded-full object-cover shadow-[0_1px_4px_rgba(0,0,0,0.08)] bg-white p-0.5"
-              src="/logo-mdle.png"
-            />
+              Espace Bureau
+            </Link>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="w-full pt-16 bg-surface min-h-[calc(100vh-80px)]">
-        <div className="flex flex-col w-full">
-          <div className="relative w-full max-w-[1200px] mx-auto px-margin md:px-margin-desktop py-space-md md:py-space-xl">
-            {/* Ambient Glows */}
-            <div className="absolute top-10 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none -z-10" />
-            <div className="absolute top-48 right-12 w-80 h-80 bg-tertiary-fixed/30 rounded-full blur-3xl pointer-events-none -z-10" />
+      {/* Bannière d'état et Compte à rebours */}
+      <div className="bg-[#b7102a] text-white py-2.5 px-4 text-center text-xs sm:text-sm font-medium shadow-inner">
+        <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+          {beforeSales && (
+            <span className="flex items-center gap-1.5">
+              <Clock className="w-4 h-4 shrink-0" />
+              Ouverture des commandes dans {remaining.days}j {remaining.hours}h {remaining.minutes}m (le 4 janvier 2027)
+            </span>
+          )}
 
-            {/* Hero Header Banner */}
-            <section className="mb-space-xl">
-              <div className="bg-surface-container-lowest/80 backdrop-blur-2xl rounded-3xl p-space-lg md:p-space-xl shadow-xl shadow-surface-container-highest/20 relative overflow-hidden">
-                <div className="flex flex-col md:flex-row items-center gap-space-lg md:gap-space-xl">
-                  {/* MDLE Emblem */}
-                  <div className="relative group shrink-0">
-                    <div className="absolute -inset-1.5 bg-gradient-to-r from-primary to-tertiary-fixed-dim rounded-full blur-md opacity-30 group-hover:opacity-60 transition duration-500" />
-                    <img
-                      alt="Logo MDLE Lycée Jean Perrin"
-                      className="relative w-24 h-24 md:w-28 md:h-28 rounded-full object-cover shadow-md bg-surface-container-lowest p-1"
-                      src="/logo-mdle.png"
-                    />
-                  </div>
-                  {/* Titles & Subheading */}
-                  <div className="flex-1 text-center md:text-left space-y-space-xs">
-                    <div className="inline-flex items-center gap-space-xs px-space-sm py-1 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm uppercase tracking-wider mb-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                      Édition Officielle 2025
-                    </div>
-                    <h1 className="font-headline-lg md:font-display-lg text-headline-lg md:text-display-lg text-on-surface tracking-tight leading-tight">
-                      Vente de Roses <span className="text-primary font-display-lg">Saint-Valentin</span>
-                    </h1>
-                    <p className="font-body-lg text-body-lg text-on-surface-variant max-w-xl">
-                      Faites livrer une rose en classe le vendredi 14 février par les délégués de la MDLE. Amour secret, admiration ou amitié pure.
-                    </p>
-                    {/* Price & Feature Badges */}
-                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-space-sm pt-space-xs">
-                      <span className="inline-flex items-center gap-1.5 px-space-md py-1.5 rounded-full bg-primary-fixed text-on-primary-fixed font-label-md text-label-md shadow-sm">
-                        <span className="material-symbols-outlined text-[16px] text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
-                          local_florist
-                        </span>
-                        2,00 € / rose fraîche
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 px-space-md py-1.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed font-label-md text-label-md shadow-sm">
-                        <span className="material-symbols-outlined text-[16px] text-tertiary" style={{ fontVariationSettings: "'FILL' 1" }}>
-                          history_edu
-                        </span>
-                        +0,50 € / mot doux scellé
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 px-space-md py-1.5 rounded-full bg-surface-container text-on-surface font-label-md text-label-md">
-                        <span className="material-symbols-outlined text-[16px]">verified</span>
-                        Livraison en classe assurée
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
+          {salesClosed && (
+            <span className="flex items-center gap-1.5">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              Les commandes sont closes pour l&apos;édition {EDITION_YEAR}. Rendez-vous le {DELIVERY_DATE_LABEL} pour la distribution !
+            </span>
+          )}
 
-            {/* Error banner if validation failed */}
-            {errorMessage && (
-              <div className="mb-space-md p-space-md rounded-2xl bg-error-container text-on-error-container font-label-md text-label-md flex items-center gap-2">
-                <span className="material-symbols-outlined text-[20px]">error</span>
-                <span>{errorMessage}</span>
-              </div>
-            )}
+          {salesAreOpen && (
+            <span className="flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 shrink-0 text-[#ffb3b1]" />
+              <strong>Commandes ouvertes jusqu&apos;au 24 janvier 23h59</strong>
+              <span className="hidden sm:inline opacity-80">•</span>
+              <span className="bg-[#9b0b21] px-2 py-0.5 rounded-md font-semibold text-xs">
+                Il reste {remaining.days}j {remaining.hours}h {remaining.minutes}m
+              </span>
+            </span>
+          )}
+        </div>
+      </div>
 
-            {/* Main Two-Column Workflow */}
-            <div id="commander" className="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-start">
-              {/* LEFT COLUMN: Configuration Flow (8 cols) */}
-              <div className="lg:col-span-8 flex flex-col gap-space-lg">
-                {/* 1. NOMBRE & COULEURS DES ROSES */}
-                <section className="bg-surface-container-lowest/90 backdrop-blur-xl rounded-3xl p-space-lg md:p-space-xl shadow-lg shadow-surface-container-highest/15 space-y-space-md">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-space-sm">
-                      <span className="w-8 h-8 rounded-full bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center justify-center font-bold">
-                        1
-                      </span>
-                      <div>
-                        <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">
-                          Nombre &amp; Couleurs des Roses
-                        </h2>
-                        <p className="font-body-sm text-body-sm text-on-surface-variant">
-                          Personnalisez chaque fleur de votre bouquet
-                        </p>
-                      </div>
-                    </div>
-                    {/* Stepper Container */}
-                    <div className="flex items-center gap-space-sm bg-surface-container-low px-space-sm py-1.5 rounded-full shadow-inner">
-                      <button
-                        aria-label="Retirer une rose"
-                        onClick={() => updateCount(roseCount - 1)}
-                        className="w-9 h-9 rounded-full bg-surface-container-lowest text-on-surface flex items-center justify-center hover:bg-surface-container transition shadow-sm active:scale-95 disabled:opacity-40 cursor-pointer"
-                        disabled={roseCount <= 1}
-                        type="button"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">remove</span>
-                      </button>
-                      <span className="font-headline-md text-headline-md text-on-surface w-8 text-center tabular-nums font-bold">
-                        {roseCount}
-                      </span>
-                      <button
-                        aria-label="Ajouter une rose"
-                        onClick={() => updateCount(roseCount + 1)}
-                        className="w-9 h-9 rounded-full bg-surface-container-lowest text-on-surface flex items-center justify-center hover:bg-surface-container transition shadow-sm active:scale-95 disabled:opacity-40 cursor-pointer"
-                        disabled={roseCount >= 20}
-                        type="button"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">add</span>
-                      </button>
-                    </div>
-                  </div>
+      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8">
+        {/* Hero explicatif */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center p-2.5 bg-[#FFF0EF] rounded-full text-[#b7102a] mb-3">
+            <Heart className="w-6 h-6 fill-current" />
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-[#231919] tracking-tight">
+            Offrez une rose pour la Saint-Valentin
+          </h2>
+          <p className="mt-2 text-sm sm:text-base text-[#565e74] max-w-xl mx-auto">
+            Faites livrer des roses rouges ou roses accompagnées d’un mot doux manuscrit, directement en classe le <strong>{DELIVERY_DATE_LABEL}</strong>.
+          </p>
 
-                  {/* Quick presets pills */}
-                  <div className="flex items-center gap-space-xs pt-space-xs flex-wrap">
-                    <span className="font-label-sm text-label-sm text-on-surface-variant pr-1">Raccourcis :</span>
-                    <button
-                      onClick={() => setAllColors('rouge')}
-                      className="px-space-md py-1 rounded-full bg-surface-container-low hover:bg-primary-fixed hover:text-on-primary-fixed font-label-md text-label-md text-on-surface transition active:scale-95 cursor-pointer font-semibold"
-                      type="button"
-                    >
-                      Toutes Rouges ❤️
-                    </button>
-                    <button
-                      onClick={() => setAllColors('rose')}
-                      className="px-space-md py-1 rounded-full bg-surface-container-low hover:bg-pink-100 hover:text-pink-900 font-label-md text-label-md text-on-surface transition active:scale-95 cursor-pointer font-semibold"
-                      type="button"
-                    >
-                      Toutes Roses 🌸
-                    </button>
-                    <button
-                      onClick={setRandomColors}
-                      className="px-space-md py-1 rounded-full bg-surface-container-low hover:bg-tertiary-fixed hover:text-on-tertiary-fixed font-label-md text-label-md text-on-surface transition active:scale-95 cursor-pointer font-semibold"
-                      type="button"
-                    >
-                      Mélange Aléatoire ✨
-                    </button>
-                  </div>
-
-                  {/* Dynamic Roses Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-space-md pt-space-sm">
-                    {roseColors.map((color, idx) => (
-                      <div
-                        key={idx}
-                        className="p-space-sm bg-surface-container-low rounded-2xl flex flex-col gap-2 transition hover:bg-surface-container"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">
-                            Rose #{idx + 1}
-                          </span>
-                          <span
-                            className={`w-3 h-3 rounded-full ${
-                              color === 'rouge' ? 'bg-primary' : 'bg-pink-400'
-                            } shadow-xs`}
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-1 p-1 bg-surface-container-lowest rounded-xl">
-                          <button
-                            type="button"
-                            onClick={() => setColorAt(idx, 'rouge')}
-                            className={`py-1.5 rounded-lg font-label-sm text-label-sm flex items-center justify-center gap-1 transition cursor-pointer ${
-                              color === 'rouge'
-                                ? 'bg-primary text-on-primary font-bold shadow-sm'
-                                : 'text-on-surface-variant hover:text-on-surface'
-                            }`}
-                          >
-                            <span>❤️</span>
-                            <span>Rouge</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setColorAt(idx, 'rose')}
-                            className={`py-1.5 rounded-lg font-label-sm text-label-sm flex items-center justify-center gap-1 transition cursor-pointer ${
-                              color === 'rose'
-                                ? 'bg-pink-600 text-white font-bold shadow-sm'
-                                : 'text-on-surface-variant hover:text-on-surface'
-                            }`}
-                          >
-                            <span>🌸</span>
-                            <span>Rose</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                {/* 2. RECIPIENT INFORMATION */}
-                <section className="bg-surface-container-lowest/90 backdrop-blur-xl rounded-3xl p-space-lg md:p-space-xl shadow-lg shadow-surface-container-highest/15 space-y-space-md">
-                  <div className="flex items-center gap-space-sm">
-                    <span className="w-8 h-8 rounded-full bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center justify-center font-bold">
-                      2
-                    </span>
-                    <div>
-                      <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">
-                        Destinataire &amp; Classe
-                      </h2>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant">
-                        L&apos;élève ou professeur qui recevra votre attention
-                      </p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md pt-space-xs">
-                    {/* Nom et prénom */}
-                    <div className="flex flex-col gap-space-xs">
-                      <label className="font-label-md text-label-md text-on-surface flex items-center gap-1 font-semibold" htmlFor="recipient-name">
-                        <span>Nom &amp; Prénom du destinataire</span>
-                        <span className="text-primary">*</span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          id="recipient-name"
-                          value={recipientName}
-                          onChange={(e) => setRecipientName(e.target.value)}
-                          className="w-full bg-surface-container-low/70 focus:bg-surface-container-lowest text-on-surface rounded-2xl px-space-md py-3 font-body-md text-body-md transition focus:outline-none focus:ring-2 focus:ring-primary shadow-inner"
-                          placeholder="ex. Léa Martin ou M. Dupont"
-                          type="text"
-                          required
-                        />
-                        <span className="material-symbols-outlined absolute right-3.5 top-3.5 text-on-surface-variant text-[20px] pointer-events-none">
-                          person
-                        </span>
-                      </div>
-                    </div>
-                    {/* Classe ou statut */}
-                    <div className="flex flex-col gap-space-xs">
-                      <label className="font-label-md text-label-md text-on-surface flex items-center gap-1 font-semibold" htmlFor="recipient-class">
-                        <span>Classe / Salle</span>
-                        <span className="text-primary">*</span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          id="recipient-class"
-                          value={recipientClass}
-                          onChange={(e) => setRecipientClass(e.target.value)}
-                          className="w-full bg-surface-container-low/70 focus:bg-surface-container-lowest text-on-surface rounded-2xl px-space-md py-3 font-body-md text-body-md transition focus:outline-none focus:ring-2 focus:ring-primary shadow-inner"
-                          list="classes-list"
-                          placeholder="ex. Terminale 2, 1ère 4, Salle des Profs..."
-                          type="text"
-                          required
-                        />
-                        <datalist id="classes-list">
-                          {CLASSES_LIST.map((cls) => (
-                            <option key={cls} value={cls} />
-                          ))}
-                        </datalist>
-                        <span className="material-symbols-outlined absolute right-3.5 top-3.5 text-on-surface-variant text-[20px] pointer-events-none">
-                          school
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  {/* Discretion Guarantee Callout */}
-                  <div className="p-space-md rounded-2xl bg-surface-container flex items-start gap-space-sm text-on-surface">
-                    <span className="material-symbols-outlined text-primary text-[22px] shrink-0 mt-0.5">
-                      sentiment_satisfied
-                    </span>
-                    <div className="text-body-sm">
-                      <span className="font-label-md font-bold">Engagement MDLE :</span> Distribution minutieuse assurée en toute discrétion et bienveillance entre 8h00 et 16h30 le vendredi 14 février 2025.
-                    </div>
-                  </div>
-                </section>
-
-                {/* 3. MESSAGE & ANONYMAT */}
-                <section className="bg-surface-container-lowest/90 backdrop-blur-xl rounded-3xl p-space-lg md:p-space-xl shadow-lg shadow-surface-container-highest/15 space-y-space-md">
-                  <div className="flex items-center gap-space-sm">
-                    <span className="w-8 h-8 rounded-full bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center justify-center font-bold">
-                      3
-                    </span>
-                    <div>
-                      <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">
-                        Message Calligraphié &amp; Anonymat
-                      </h2>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant">
-                        Un mot manuscrit scellé à la cire et remis avec la rose
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Card Toggle for Mot Doux */}
-                  <div className="bg-surface-container-low/60 rounded-2xl p-space-md flex items-center justify-between transition hover:bg-surface-container-low">
-                    <div className="flex items-center gap-space-sm">
-                      <span className="w-10 h-10 rounded-full bg-tertiary-fixed text-tertiary flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined text-[20px]">mail</span>
-                      </span>
-                      <div>
-                        <div className="font-label-lg text-label-lg text-on-surface font-semibold">
-                          Ajouter un mot doux calligraphié (+0,50 €)
-                        </div>
-                        <div className="font-body-sm text-body-sm text-on-surface-variant">
-                          Rédigé sur papier texturé avec cachet MDLE officiel
-                        </div>
-                      </div>
-                    </div>
-                    {/* Toggle */}
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        id="toggle-mot-doux"
-                        type="checkbox"
-                        checked={hasMotDoux}
-                        onChange={(e) => setHasMotDoux(e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-secondary-fixed rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
-                    </label>
-                  </div>
-
-                  {/* Collapsible Textarea for Message */}
-                  {hasMotDoux && (
-                    <div className="transition-all duration-300">
-                      <div className="p-space-md rounded-2xl bg-tertiary-fixed/20 space-y-space-xs relative">
-                        <div className="flex items-center justify-between">
-                          <span className="font-label-sm text-label-sm text-tertiary flex items-center gap-1 font-semibold">
-                            <span className="material-symbols-outlined text-[16px]">edit_note</span>
-                            Votre texte (max 200 caractères)
-                          </span>
-                          <span className="font-label-sm text-label-sm text-on-surface-variant">
-                            {motDouxText.length} / 200
-                          </span>
-                        </div>
-                        <textarea
-                          id="mot-doux-text"
-                          value={motDouxText}
-                          onChange={(e) => setMotDouxText(e.target.value.slice(0, 200))}
-                          className="w-full bg-surface-container-lowest/90 text-on-surface rounded-xl p-space-sm font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary shadow-sm resize-none"
-                          maxLength={200}
-                          placeholder="Écrivez votre message secret, tendre ou amical ici..."
-                          rows={3}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Anonymity Toggle Card */}
-                  <div className="bg-surface-container-low/60 rounded-2xl p-space-md space-y-space-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-space-sm">
-                        <span className="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0">
-                          <span className="material-symbols-outlined text-[20px]">visibility_off</span>
-                        </span>
-                        <div>
-                          <div className="font-label-lg text-label-lg text-on-surface font-semibold">
-                            Offrir en tout anonymat
-                          </div>
-                          <div className="font-body-sm text-body-sm text-on-surface-variant">
-                            Ne révélez pas votre nom sur l&apos;étiquette de livraison
-                          </div>
-                        </div>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          id="toggle-anonymous"
-                          type="checkbox"
-                          checked={isAnonymous}
-                          onChange={(e) => setIsAnonymous(e.target.checked)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-secondary-fixed rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
-                      </label>
-                    </div>
-
-                    {/* Dynamic State depending on anonymity */}
-                    {isAnonymous ? (
-                      <div className="px-space-md py-2 rounded-xl bg-surface-container-lowest font-body-sm text-body-sm text-on-surface flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[18px] text-tertiary">lock</span>
-                        <span>
-                          <strong>Anonymat Garanti :</strong> Le destinataire recevra uniquement la mention{' '}
-                          <em>&quot;Un admirateur ou une admiratrice secrète&quot;</em>.
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="pt-space-xs">
-                        <label className="font-label-md text-label-md text-on-surface mb-1 block font-semibold" htmlFor="sender-name">
-                          Votre prénom et nom (affiché sur la carte)
-                        </label>
-                        <input
-                          id="sender-name"
-                          value={senderName}
-                          onChange={(e) => setSenderName(e.target.value.slice(0, 100))}
-                          className="w-full bg-surface-container-lowest text-on-surface rounded-xl px-space-md py-2.5 font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary shadow-inner"
-                          placeholder="ex. Thomas Roux (T°3)"
-                          type="text"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </section>
-
-                {/* 4. MODE DE RÈGLEMENT (100% SumUp CB ou Foyer MDLE) */}
-                <section className="bg-surface-container-lowest/90 backdrop-blur-xl rounded-3xl p-space-lg md:p-space-xl shadow-lg shadow-surface-container-highest/15 space-y-space-md">
-                  <div className="flex items-center gap-space-sm">
-                    <span className="w-8 h-8 rounded-full bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center justify-center font-bold">
-                      4
-                    </span>
-                    <div>
-                      <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">Mode de Règlement</h2>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant">
-                        Directement en ligne par Carte Bancaire ou en espèces au foyer
-                      </p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md pt-space-xs">
-                    {/* Method 1: SumUp Online (Carte Bancaire) */}
-                    <div
-                      onClick={() => setPaymentMethod('sumup_online')}
-                      className={`cursor-pointer rounded-2xl p-space-md transition-all relative block shadow-sm hover:shadow-md ${
-                        paymentMethod === 'sumup_online'
-                          ? 'bg-surface-container ring-2 ring-primary/40'
-                          : 'bg-surface-container-low'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-space-sm">
-                          <span className="material-symbols-outlined text-primary text-[24px]">credit_card</span>
-                          <div className="font-headline-sm text-headline-sm text-on-surface font-bold">
-                            Carte Bancaire en ligne
-                          </div>
-                        </div>
-                        <input
-                          type="radio"
-                          name="payment_method"
-                          value="sumup_online"
-                          checked={paymentMethod === 'sumup_online'}
-                          onChange={() => setPaymentMethod('sumup_online')}
-                          className="accent-primary w-4 h-4 mt-1"
-                        />
-                      </div>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant mt-space-sm">
-                        Paiement sécurisé par <strong>Carte Bancaire</strong> via la passerelle certifiée <strong>SumUp</strong>. Validation immédiate de votre commande.
-                      </p>
-                      <div className="flex items-center gap-space-xs mt-space-sm flex-wrap">
-                        <span className="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm text-on-surface shadow-xs font-semibold">
-                          Carte Bancaire
-                        </span>
-                        <span className="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm text-on-surface shadow-xs font-semibold">
-                          Visa
-                        </span>
-                        <span className="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm text-on-surface shadow-xs font-semibold">
-                          Mastercard
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Method 2: Counter MDLE */}
-                    <div
-                      onClick={() => setPaymentMethod('mdle_counter')}
-                      className={`cursor-pointer rounded-2xl p-space-md transition-all relative block shadow-sm hover:shadow-md ${
-                        paymentMethod === 'mdle_counter'
-                          ? 'bg-surface-container ring-2 ring-primary/40'
-                          : 'bg-surface-container-low'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-space-sm">
-                          <span className="material-symbols-outlined text-tertiary text-[24px]">storefront</span>
-                          <div className="font-headline-sm text-headline-sm text-on-surface font-bold">
-                            Au Foyer MDLE
-                          </div>
-                        </div>
-                        <input
-                          type="radio"
-                          name="payment_method"
-                          value="mdle_counter"
-                          checked={paymentMethod === 'mdle_counter'}
-                          onChange={() => setPaymentMethod('mdle_counter')}
-                          className="accent-primary w-4 h-4 mt-1"
-                        />
-                      </div>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant mt-space-sm">
-                        Réglez en <strong>espèces</strong> ou <strong>CB sans contact</strong> lors des pauses récré ou entre 12h et 13h30.
-                      </p>
-                      <div className="flex items-center gap-space-xs mt-space-sm">
-                        <span className="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm text-on-surface shadow-xs font-semibold">
-                          Espèces
-                        </span>
-                        <span className="px-2 py-0.5 rounded bg-surface-container-lowest font-label-sm text-label-sm text-on-surface shadow-xs font-semibold">
-                          TPE au Foyer
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-              </div>
-
-              {/* RIGHT COLUMN: Sticky Live Order Summary (4 cols) */}
-              <aside className="lg:col-span-4 sticky top-20 flex flex-col gap-space-md">
-                <div className="bg-surface-container-lowest/95 backdrop-blur-2xl rounded-3xl p-space-lg shadow-xl shadow-surface-container-highest/20 space-y-space-md">
-                  <div className="flex items-center justify-between pb-space-sm">
-                    <div className="flex items-center gap-space-xs">
-                      <span className="material-symbols-outlined text-primary text-[20px]">shopping_bag</span>
-                      <h3 className="font-headline-sm text-headline-sm text-on-surface font-bold">Récapitulatif</h3>
-                    </div>
-                    <span className="font-label-sm text-label-sm bg-primary-fixed text-on-primary-fixed px-2 py-0.5 rounded-full font-semibold">
-                      14 Février
-                    </span>
-                  </div>
-
-                  {/* Detailed breakdown */}
-                  <div className="space-y-space-sm font-body-md text-body-md">
-                    <div className="flex items-center justify-between text-on-surface">
-                      <span>
-                        {totalRoses}x Rose{totalRoses > 1 ? 's' : ''} fraîche{totalRoses > 1 ? 's' : ''}
-                      </span>
-                      <span className="font-semibold tabular-nums">
-                        {rosesTotal.toFixed(2).replace('.', ',')} €
-                      </span>
-                    </div>
-
-                    {/* Color badges */}
-                    <div className="flex flex-wrap gap-1 pb-1">
-                      {redCount > 0 && (
-                        <span className="px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm font-semibold">
-                          {redCount}x Rouge{redCount > 1 ? 's' : ''} ❤️
-                        </span>
-                      )}
-                      {pinkCount > 0 && (
-                        <span className="px-2 py-0.5 rounded-full bg-pink-100 text-pink-900 font-label-sm text-label-sm font-semibold">
-                          {pinkCount}x Rose{pinkCount > 1 ? 's' : ''} 🌸
-                        </span>
-                      )}
-                    </div>
-
-                    {hasMotDoux && (
-                      <div className="flex items-center justify-between text-on-surface">
-                        <span className="flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[16px] text-tertiary">drafts</span>
-                          Mot doux calligraphié
-                        </span>
-                        <span className="font-semibold tabular-nums">+0,50 €</span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between text-on-surface-variant font-body-sm text-body-sm">
-                      <span>Livraison en classe</span>
-                      <span className="text-on-surface font-medium">Offerte par la MDLE</span>
-                    </div>
-                  </div>
-
-                  {/* Total Due Row */}
-                  <div className="pt-space-sm mt-space-sm bg-surface-container-low/50 p-space-md rounded-2xl flex items-center justify-between">
-                    <div>
-                      <div className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">
-                        Total à régler
-                      </div>
-                      <div className="font-body-sm text-body-sm text-on-surface-variant">
-                        TTC au profit des projets MDLE
-                      </div>
-                    </div>
-                    <div className="font-display-lg text-display-lg text-primary tabular-nums font-bold">
-                      {grandTotalFormatted}
-                    </div>
-                  </div>
-
-                  {/* Main CTA Trigger Button */}
-                  <button
-                    onClick={handleOpenCheckout}
-                    disabled={isSubmitting}
-                    className="w-full py-4 px-space-lg rounded-full bg-primary hover:bg-primary-container text-on-primary font-headline-sm text-headline-sm shadow-lg shadow-primary/30 flex items-center justify-center gap-space-sm transition-all duration-200 active:scale-95 group cursor-pointer disabled:opacity-60"
-                    type="button"
-                  >
-                    <span className="material-symbols-outlined text-[20px] group-hover:rotate-12 transition-transform">
-                      lock
-                    </span>
-                    <span>
-                      {paymentMethod === 'sumup_online'
-                        ? `Commander et payer par CB (${grandTotalFormatted})`
-                        : `Réserver sans payer (${grandTotalFormatted})`}
-                    </span>
-                  </button>
-
-                  {/* Badges Guarantee */}
-                  <div className="text-center space-y-1 pt-space-xs">
-                    <p className="font-body-sm text-body-sm text-on-surface-variant flex items-center justify-center gap-1">
-                      <span className="material-symbols-outlined text-[16px] text-primary">verified_user</span>
-                      100% des bénéfices financent les sorties et événements lycéens.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Secondary Info Card: Lycée Perrin MDLE FAQ */}
-                <div id="faq" className="bg-surface-container-lowest/80 backdrop-blur-md rounded-2xl p-space-md shadow-sm space-y-space-xs">
-                  <div className="font-label-md text-label-md text-on-surface flex items-center gap-1.5 font-bold">
-                    <span className="material-symbols-outlined text-tertiary text-[18px]">help_center</span>
-                    Comment se passe la distribution ?
-                  </div>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
-                    Les délégués de la MDLE passeront discrètement avec l&apos;autorisation du professeur dans chaque classe le vendredi 14 février. Les roses sont conservées chez notre fleuriste partenaire dans une fraîcheur absolue jusqu&apos;au matin-même.
-                  </p>
-                </div>
-              </aside>
-            </div>
-
-            {/* Admin access button */}
-            <div className="mt-space-xl pt-space-lg text-center">
-              <a
-                href="/admin"
-                className="inline-flex items-center gap-1.5 px-space-md py-1.5 rounded-full bg-surface-container-low/60 hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition font-label-sm text-label-sm opacity-60 hover:opacity-100"
-              >
-                <span className="material-symbols-outlined text-[14px]">lock</span>
-                <span>Espace bureau &amp; délégués MDLE</span>
-              </a>
-            </div>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-[#565e74]">
+            <span className="inline-flex items-center gap-1 bg-white px-3 py-1 rounded-full border border-[#F6DEDC]">
+              <Calendar className="w-3.5 h-3.5 text-[#b7102a]" /> Distribution : {DELIVERY_DATE_LABEL}
+            </span>
+            <span className="inline-flex items-center gap-1 bg-white px-3 py-1 rounded-full border border-[#F6DEDC]">
+              <MapPin className="w-3.5 h-3.5 text-[#b7102a]" /> En classe au Lycée Jean Perrin
+            </span>
+            <span className="inline-flex items-center gap-1 bg-white px-3 py-1 rounded-full border border-[#F6DEDC]">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#b7102a]" /> Anonymat garanti auprès du destinataire
+            </span>
           </div>
         </div>
+
+        {/* Formulaire de commande */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Honeypot invisible */}
+          <div className="hidden" aria-hidden="true">
+            <input
+              type="text"
+              name="website"
+              tabIndex={-1}
+              autoComplete="off"
+              value={honeypot}
+              onChange={(e) => setHoneypot(e.target.value)}
+            />
+          </div>
+
+          {/* SECTION 1 : CHOIX DES ROSES */}
+          <section className="bg-white rounded-2xl p-5 sm:p-6 border border-[#F6DEDC] shadow-xs">
+            <div className="flex items-center justify-between border-b border-[#F6DEDC] pb-3 mb-4">
+              <div>
+                <span className="text-xs font-bold text-[#b7102a] uppercase tracking-wider">Étape 1</span>
+                <h3 className="text-lg font-bold text-[#231919]">Choix des roses</h3>
+              </div>
+              <span className="text-xs font-semibold text-[#565e74] bg-[#FFF0EF] px-2.5 py-1 rounded-full">
+                {PRICE_PER_ROSE.toFixed(2)} € / rose
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Roses Rouges */}
+              <div className="bg-[#FFF8F7] border border-[#F6DEDC] rounded-xl p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#ffdad8] flex items-center justify-center text-[#b7102a]">
+                    <Heart className="w-5 h-5 fill-current" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-[#231919]">Roses Rouges</h4>
+                    <p className="text-xs text-[#565e74]">Symbole de passion</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRedCount((prev) => Math.max(0, prev - 1))}
+                    disabled={redCount <= 0 || !salesAreOpen}
+                    className="w-8 h-8 rounded-lg bg-white border border-[#F6DEDC] text-[#231919] font-bold flex items-center justify-center disabled:opacity-40 hover:bg-[#FFF0EF] transition-colors"
+                    aria-label="Diminuer les roses rouges"
+                  >
+                    -
+                  </button>
+                  <span className="w-8 text-center font-bold text-sm text-[#231919]">{redCount}</span>
+                  <button
+                    type="button"
+                    onClick={() => setRedCount((prev) => (totalRoses < MAX_ROSES ? prev + 1 : prev))}
+                    disabled={totalRoses >= MAX_ROSES || !salesAreOpen}
+                    className="w-8 h-8 rounded-lg bg-white border border-[#F6DEDC] text-[#231919] font-bold flex items-center justify-center disabled:opacity-40 hover:bg-[#FFF0EF] transition-colors"
+                    aria-label="Augmenter les roses rouges"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* Roses Roses */}
+              <div className="bg-[#FFF8F7] border border-[#F6DEDC] rounded-xl p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#fce7e6] flex items-center justify-center text-[#db313f]">
+                    <Heart className="w-5 h-5 fill-current" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-[#231919]">Roses Roses</h4>
+                    <p className="text-xs text-[#565e74]">Douceur et affection</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPinkCount((prev) => Math.max(0, prev - 1))}
+                    disabled={pinkCount <= 0 || !salesAreOpen}
+                    className="w-8 h-8 rounded-lg bg-white border border-[#F6DEDC] text-[#231919] font-bold flex items-center justify-center disabled:opacity-40 hover:bg-[#FFF0EF] transition-colors"
+                    aria-label="Diminuer les roses roses"
+                  >
+                    -
+                  </button>
+                  <span className="w-8 text-center font-bold text-sm text-[#231919]">{pinkCount}</span>
+                  <button
+                    type="button"
+                    onClick={() => setPinkCount((prev) => (totalRoses < MAX_ROSES ? prev + 1 : prev))}
+                    disabled={totalRoses >= MAX_ROSES || !salesAreOpen}
+                    className="w-8 h-8 rounded-lg bg-white border border-[#F6DEDC] text-[#231919] font-bold flex items-center justify-center disabled:opacity-40 hover:bg-[#FFF0EF] transition-colors"
+                    aria-label="Augmenter les roses roses"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-center justify-between text-xs text-[#565e74] px-1">
+              <span>Total : <strong>{totalRoses} rose{totalRoses > 1 ? 's' : ''}</strong> (max {MAX_ROSES})</span>
+              <span>Sous-total roses : <strong>{(totalRoses * PRICE_PER_ROSE).toFixed(2)} €</strong></span>
+            </div>
+          </section>
+
+          {/* SECTION 2 : MOT DOUX */}
+          <section className="bg-white rounded-2xl p-5 sm:p-6 border border-[#F6DEDC] shadow-xs">
+            <div className="flex items-center justify-between border-b border-[#F6DEDC] pb-3 mb-4">
+              <div>
+                <span className="text-xs font-bold text-[#b7102a] uppercase tracking-wider">Étape 2</span>
+                <h3 className="text-lg font-bold text-[#231919]">Mot doux manuscrit (optionnel)</h3>
+              </div>
+              <span className="text-xs font-semibold text-[#565e74] bg-[#FFF0EF] px-2.5 py-1 rounded-full">
+                +{PRICE_MOT_DOUX.toFixed(2)} €
+              </span>
+            </div>
+
+            <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl hover:bg-[#FFF8F7] transition-colors">
+              <input
+                type="checkbox"
+                checked={hasMessage}
+                onChange={(e) => setHasMessage(e.target.checked)}
+                disabled={!salesAreOpen}
+                className="mt-1 w-4 h-4 text-[#b7102a] border-[#F6DEDC] rounded-sm focus:ring-[#b7102a]"
+              />
+              <div className="text-xs sm:text-sm">
+                <span className="font-bold text-[#231919] block">
+                  Ajouter un mot doux manuscrit (+0,50 €)
+                </span>
+                <span className="text-[#565e74]">
+                  Votre message sera soigneusement retranscrit à la main sur une carte spéciale MDLE et attaché à la rose.
+                </span>
+              </div>
+            </label>
+
+            {hasMessage && (
+              <div className="mt-4 pt-3 border-t border-[#F6DEDC]">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="message_text" className="text-xs font-bold text-[#231919]">
+                    Votre message (200 caractères max) :
+                  </label>
+                  <span className={`text-xs ${messageText.length > 180 ? 'text-[#ba1a1a] font-bold' : 'text-[#565e74]'}`}>
+                    {messageText.length} / 200
+                  </span>
+                </div>
+                <textarea
+                  id="message_text"
+                  rows={3}
+                  maxLength={200}
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  disabled={!salesAreOpen}
+                  placeholder="Écris ton mot ici... (déclaration, mot d'amitié, compliment, blague...)"
+                  className="w-full text-sm p-3 rounded-xl border border-[#F6DEDC] bg-[#FFF8F7] text-[#231919] placeholder:text-[#8f6f6e] focus:bg-white transition-colors"
+                />
+              </div>
+            )}
+          </section>
+
+          {/* SECTION 3 : DESTINATAIRE */}
+          <section className="bg-white rounded-2xl p-5 sm:p-6 border border-[#F6DEDC] shadow-xs">
+            <div className="border-b border-[#F6DEDC] pb-3 mb-4">
+              <span className="text-xs font-bold text-[#b7102a] uppercase tracking-wider">Étape 3</span>
+              <h3 className="text-lg font-bold text-[#231919]">Destinataire au Lycée</h3>
+              <p className="text-xs text-[#565e74]">
+                Ces informations permettent au bureau MDLE de distribuer la rose dans la bonne salle.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="recipient_name" className="block text-xs font-bold text-[#231919] mb-1.5">
+                  Prénom et nom du destinataire <span className="text-[#ba1a1a]">*</span>
+                </label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-[#565e74] absolute left-3 top-3 pointer-events-none" />
+                  <input
+                    id="recipient_name"
+                    type="text"
+                    required
+                    maxLength={100}
+                    value={recipientName}
+                    onChange={(e) => setRecipientName(e.target.value)}
+                    disabled={!salesAreOpen}
+                    placeholder="Ex: Camille Dupont"
+                    className="w-full text-sm pl-9 pr-3 py-2.5 rounded-xl border border-[#F6DEDC] bg-[#FFF8F7] text-[#231919] placeholder:text-[#8f6f6e] focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="recipient_class" className="block text-xs font-bold text-[#231919] mb-1.5">
+                  Classe ou statut <span className="text-[#ba1a1a]">*</span>
+                </label>
+                <div className="relative">
+                  <select
+                    id="recipient_class"
+                    required
+                    value={recipientClass}
+                    onChange={(e) => setRecipientClass(e.target.value)}
+                    disabled={!salesAreOpen}
+                    className="w-full text-sm px-3 py-2.5 rounded-xl border border-[#F6DEDC] bg-[#FFF8F7] text-[#231919] focus:bg-white appearance-none"
+                  >
+                    {OFFICIAL_CLASSES.map((cls) => (
+                      <option key={cls} value={cls}>
+                        {cls}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-[#565e74] absolute right-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+            </div>
+
+            {recipientClass === 'Autre' && (
+              <div className="mt-3">
+                <label htmlFor="custom_class" className="block text-xs font-bold text-[#231919] mb-1.5">
+                  Précisez la salle, le service ou la localisation <span className="text-[#ba1a1a]">*</span>
+                </label>
+                <input
+                  id="custom_class"
+                  type="text"
+                  required
+                  maxLength={50}
+                  value={customClass}
+                  onChange={(e) => setCustomClass(e.target.value)}
+                  disabled={!salesAreOpen}
+                  placeholder="Ex: Salle des professeurs, Vie scolaire, Bâtiment B..."
+                  className="w-full text-sm px-3 py-2.5 rounded-xl border border-[#F6DEDC] bg-[#FFF8F7] text-[#231919] placeholder:text-[#8f6f6e] focus:bg-white"
+                />
+              </div>
+            )}
+          </section>
+
+          {/* SECTION 4 : EXPÉDITEUR & ANONYMAT */}
+          <section className="bg-white rounded-2xl p-5 sm:p-6 border border-[#F6DEDC] shadow-xs">
+            <div className="border-b border-[#F6DEDC] pb-3 mb-4">
+              <span className="text-xs font-bold text-[#b7102a] uppercase tracking-wider">Étape 4</span>
+              <h3 className="text-lg font-bold text-[#231919]">Tes coordonnées</h3>
+              <p className="text-xs text-[#565e74]">
+                Obligatoire pour le suivi de la commande et la réception de ton reçu.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="sender_name" className="block text-xs font-bold text-[#231919] mb-1.5">
+                  Ton prénom et nom <span className="text-[#ba1a1a]">*</span>
+                </label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-[#565e74] absolute left-3 top-3 pointer-events-none" />
+                  <input
+                    id="sender_name"
+                    type="text"
+                    required
+                    maxLength={100}
+                    value={senderName}
+                    onChange={(e) => setSenderName(e.target.value)}
+                    disabled={!salesAreOpen}
+                    placeholder="Ex: Thomas Martin"
+                    className="w-full text-sm pl-9 pr-3 py-2.5 rounded-xl border border-[#F6DEDC] bg-[#FFF8F7] text-[#231919] placeholder:text-[#8f6f6e] focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="sender_email" className="block text-xs font-bold text-[#231919] mb-1.5">
+                  Ton adresse e-mail <span className="text-[#ba1a1a]">*</span>
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-[#565e74] absolute left-3 top-3 pointer-events-none" />
+                  <input
+                    id="sender_email"
+                    type="email"
+                    required
+                    maxLength={150}
+                    value={senderEmail}
+                    onChange={(e) => setSenderEmail(e.target.value)}
+                    disabled={!salesAreOpen}
+                    placeholder="Ex: thomas.martin@gmail.com"
+                    className="w-full text-sm pl-9 pr-3 py-2.5 rounded-xl border border-[#F6DEDC] bg-[#FFF8F7] text-[#231919] placeholder:text-[#8f6f6e] focus:bg-white"
+                  />
+                </div>
+                <p className="text-[11px] text-[#565e74] mt-1">
+                  Tu recevras ton reçu et ta référence de commande par e-mail.
+                </p>
+              </div>
+            </div>
+
+            {/* Toggle Anonymat strict */}
+            <div className="mt-4 pt-4 border-t border-[#F6DEDC]">
+              <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl bg-[#FFF8F7] border border-[#F6DEDC]">
+                <input
+                  type="checkbox"
+                  checked={isAnonymous}
+                  onChange={(e) => setIsAnonymous(e.target.checked)}
+                  disabled={!salesAreOpen}
+                  className="mt-1 w-4 h-4 text-[#b7102a] border-[#F6DEDC] rounded-sm focus:ring-[#b7102a]"
+                />
+                <div className="text-xs sm:text-sm">
+                  <span className="font-bold text-[#231919] flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-[#b7102a]" />
+                    Rester anonyme pour le destinataire
+                  </span>
+                  <span className="text-[#565e74] block mt-0.5 text-xs">
+                    Ton nom est connu uniquement du bureau MDLE, jamais du destinataire si tu choisis l&apos;anonymat.
+                  </span>
+                </div>
+              </label>
+            </div>
+          </section>
+
+          {/* SECTION 5 : MODE DE RÈGLEMENT */}
+          <section className="bg-white rounded-2xl p-5 sm:p-6 border border-[#F6DEDC] shadow-xs">
+            <div className="border-b border-[#F6DEDC] pb-3 mb-4">
+              <span className="text-xs font-bold text-[#b7102a] uppercase tracking-wider">Étape 5</span>
+              <h3 className="text-lg font-bold text-[#231919]">Mode de règlement</h3>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Carte bancaire en ligne */}
+              <label
+                className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                  effectivePaymentMethod === 'sumup_online'
+                    ? 'border-[#b7102a] bg-[#FFF8F7]'
+                    : 'border-[#F6DEDC] bg-white hover:bg-[#FFF8F7]'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="payment_method"
+                  value="sumup_online"
+                  checked={effectivePaymentMethod === 'sumup_online'}
+                  onChange={() => setPaymentMethod('sumup_online')}
+                  disabled={!salesAreOpen}
+                  className="mt-1 w-4 h-4 text-[#b7102a] focus:ring-[#b7102a]"
+                />
+                <div>
+                  <span className="font-bold text-sm text-[#231919] flex items-center gap-1.5">
+                    <CreditCard className="w-4 h-4 text-[#b7102a]" />
+                    Carte Bancaire en ligne
+                  </span>
+                  <p className="text-xs text-[#565e74] mt-1">
+                    Paiement sécurisé par carte (SumUp). Validation immédiate de votre commande.
+                  </p>
+                </div>
+              </label>
+
+              {/* Foyer MDLE Comptoir */}
+              <label
+                className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all ${
+                  !counterIsOpen
+                    ? 'opacity-50 cursor-not-allowed border-[#F6DEDC] bg-gray-50'
+                    : effectivePaymentMethod === 'mdle_counter'
+                    ? 'border-[#b7102a] bg-[#FFF8F7] cursor-pointer'
+                    : 'border-[#F6DEDC] bg-white hover:bg-[#FFF8F7] cursor-pointer'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="payment_method"
+                  value="mdle_counter"
+                  checked={effectivePaymentMethod === 'mdle_counter'}
+                  onChange={() => counterIsOpen && setPaymentMethod('mdle_counter')}
+                  disabled={!counterIsOpen || !salesAreOpen}
+                  className="mt-1 w-4 h-4 text-[#b7102a] focus:ring-[#b7102a]"
+                />
+                <div>
+                  <span className="font-bold text-sm text-[#231919] flex items-center gap-1.5">
+                    <Coins className="w-4 h-4 text-[#b7102a]" />
+                    Règlement au Foyer MDLE
+                  </span>
+                  <p className="text-xs text-[#565e74] mt-1">
+                    Espèces ou CB au comptoir ({COUNTER_LOCATION}).
+                    <br />
+                    <strong>Date limite : {COUNTER_CLOSING_LABEL}</strong>.
+                  </p>
+                  {!counterIsOpen && (
+                    <span className="inline-block mt-1 text-[11px] font-bold text-[#ba1a1a]">
+                      Comptoir clôturé. Règlement en ligne uniquement.
+                    </span>
+                  )}
+                </div>
+              </label>
+            </div>
+          </section>
+
+          {/* RÉCAPITULATIF & SOUMISSION DESKTOP */}
+          <div className="bg-white rounded-2xl p-6 border border-[#F6DEDC] shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+              <span className="text-xs text-[#565e74] block">Montant total de votre commande :</span>
+              <div className="text-2xl font-black text-[#b7102a]">{totalAmount.toFixed(2)} €</div>
+              <span className="text-xs text-[#565e74]">
+                {totalRoses} rose{totalRoses > 1 ? 's' : ''} {hasMessage ? '+ mot doux' : ''}
+              </span>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting || !salesAreOpen || totalRoses < 1}
+              className="w-full sm:w-auto px-8 py-3.5 rounded-full font-bold text-sm text-white bg-[#b7102a] hover:bg-[#9b0b21] active:scale-98 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center justify-center gap-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Traitement en cours...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  Valider ma commande ({totalAmount.toFixed(2)} €)
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+
+        {/* SECTION "L'OPÉRATION" (FAQ & DÉTAILS) */}
+        <section id="operation" className="mt-16 bg-white rounded-2xl p-6 sm:p-8 border border-[#F6DEDC]">
+          <div className="text-center max-w-xl mx-auto mb-8">
+            <span className="text-xs font-bold text-[#b7102a] uppercase tracking-wider block mb-1">
+              Tout savoir
+            </span>
+            <h3 className="text-xl sm:text-2xl font-bold text-[#231919]">
+              L&apos;opération Saint-Valentin {EDITION_YEAR}
+            </h3>
+            <p className="text-xs sm:text-sm text-[#565e74] mt-1">
+              Organisée par les élèves bénévoles de la Maison Des Lycéens et Étudiants du Lycée Jean Perrin.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-[#231919]">
+            <div className="p-4 bg-[#FFF8F7] rounded-xl border border-[#F6DEDC]">
+              <h4 className="font-bold flex items-center gap-2 text-[#b7102a] mb-2">
+                <Calendar className="w-4 h-4" /> Quelles sont les dates clés ?
+              </h4>
+              <ul className="text-xs text-[#565e74] space-y-1.5">
+                <li>• <strong>4 janvier 2027</strong> : Ouverture officielle des commandes.</li>
+                <li>• <strong>{COUNTER_CLOSING_LABEL}</strong> : Clôture impérative des paiements en espèces au Foyer MDLE.</li>
+                <li>• <strong>Dimanche 24 janvier 2027 à 23h59</strong> : Clôture définitive des commandes en ligne.</li>
+                <li>• <strong>{DELIVERY_DATE_LABEL}</strong> : Distribution des roses directement en classe.</li>
+              </ul>
+            </div>
+
+            <div className="p-4 bg-[#FFF8F7] rounded-xl border border-[#F6DEDC]">
+              <h4 className="font-bold flex items-center gap-2 text-[#b7102a] mb-2">
+                <Coins className="w-4 h-4" /> Tarifs et options
+              </h4>
+              <p className="text-xs text-[#565e74] leading-relaxed">
+                Le prix est fixé à <strong>{PRICE_PER_ROSE.toFixed(2)} € par rose</strong> (rouge ou rose au choix).
+                L&apos;option mot doux manuscrit est à <strong>+{PRICE_MOT_DOUX.toFixed(2)} €</strong>. Chaque mot est rédigé avec soin sur une carte spéciale MDLE.
+              </p>
+            </div>
+
+            <div className="p-4 bg-[#FFF8F7] rounded-xl border border-[#F6DEDC]">
+              <h4 className="font-bold flex items-center gap-2 text-[#b7102a] mb-2">
+                <CreditCard className="w-4 h-4" /> Comment régler sa commande ?
+              </h4>
+              <p className="text-xs text-[#565e74] leading-relaxed">
+                Deux options au choix : soit directement par <strong>Carte Bancaire en ligne</strong> via la plateforme sécurisée SumUp, soit en <strong>espèces ou carte au Foyer MDLE</strong> ({COUNTER_LOCATION}) aux récréations et le midi ({COUNTER_HOURS}).
+              </p>
+            </div>
+
+            <div className="p-4 bg-[#FFF8F7] rounded-xl border border-[#F6DEDC]">
+              <h4 className="font-bold flex items-center gap-2 text-[#b7102a] mb-2">
+                <Lock className="w-4 h-4" /> Comment fonctionne l&apos;anonymat ?
+              </h4>
+              <p className="text-xs text-[#565e74] leading-relaxed">
+                Si vous cochez l&apos;option d&apos;anonymat, la carte remise au destinataire ne portera <strong>aucune mention de votre identité</strong>. Seuls les membres responsables du bureau MDLE ont accès à votre nom dans le cadre de la gestion administrative.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-8 pt-6 border-t border-[#F6DEDC] text-center text-xs text-[#565e74]">
+            Une question ou besoin d&apos;aide ? Contactez la MDLE par e-mail à{' '}
+            <a href={`mailto:${CONTACT_EMAIL}`} className="text-[#b7102a] font-semibold underline">
+              {CONTACT_EMAIL}
+            </a>{' '}
+            ou via Instagram{' '}
+            <span className="font-semibold text-[#231919]">{MDLE_INSTAGRAM}</span>.
+          </div>
+        </section>
       </main>
 
-      {/* SUMUP / CHECKOUT POPUP MODAL */}
-      {isModalOpen && (
-        <div
-          id="checkout-modal"
-          className="fixed inset-0 z-50 flex items-center justify-center p-space-md bg-inverse-surface/60 backdrop-blur-md animate-in fade-in duration-200"
-          onClick={(e) => {
-            if (e.target === e.currentTarget && !isSubmitting) setIsModalOpen(false)
-          }}
+      {/* Barre collante mobile (Sticky Bottom Bar) */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#F6DEDC] p-3 z-20 shadow-lg flex items-center justify-between">
+        <div>
+          <span className="text-[11px] text-[#565e74] block">Total :</span>
+          <span className="text-lg font-black text-[#b7102a]">{totalAmount.toFixed(2)} €</span>
+        </div>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={isSubmitting || !salesAreOpen || totalRoses < 1}
+          className="px-6 py-2.5 rounded-full font-bold text-xs text-white bg-[#b7102a] hover:bg-[#9b0b21] active:scale-95 disabled:opacity-50 transition-all shadow-md flex items-center gap-1.5"
         >
-          <div className="bg-surface-container-lowest w-full max-w-md rounded-3xl p-space-lg md:p-space-xl shadow-2xl relative">
-            {/* Close Button */}
-            {!isSubmitting && (
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="absolute top-5 right-5 w-8 h-8 rounded-full bg-surface-container text-on-surface flex items-center justify-center hover:bg-surface-container-high transition cursor-pointer"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            )}
+          {isSubmitting ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <>
+              <Send className="w-3.5 h-3.5" />
+              Commander
+            </>
+          )}
+        </button>
+      </div>
 
-            {!paymentDone ? (
-              <>
-                {/* Modal Header */}
-                <div className="flex flex-col items-center text-center space-y-1 mb-space-md">
-                  <div className="w-12 h-12 rounded-full bg-primary-fixed flex items-center justify-center text-primary mb-1">
-                    <span className="material-symbols-outlined text-[24px]">favorite</span>
-                  </div>
-                  <h3 className="font-headline-md text-headline-md text-on-surface font-bold">
-                    Confirmation de Commande
+      {/* Footer */}
+      <footer className="bg-white border-t border-[#F6DEDC] py-8 px-4 text-center text-xs text-[#565e74] mt-12 mb-16 sm:mb-0">
+        <div className="max-w-4xl mx-auto space-y-2">
+          <p className="font-medium text-[#231919]">
+            Maison Des Lycéens et Étudiants du Lycée Jean Perrin — Association Loi 1901
+          </p>
+          <p>
+            Édition Saint-Valentin {EDITION_YEAR} • Distribution officielle en classe le {DELIVERY_DATE_LABEL}
+          </p>
+          <div className="pt-2 flex items-center justify-center gap-4 text-[11px]">
+            <Link href="/admin" className="hover:text-[#b7102a] underline">
+              Connexion Administration MDLE
+            </Link>
+            <span>•</span>
+            <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-[#b7102a] underline">
+              {CONTACT_EMAIL}
+            </a>
+          </div>
+        </div>
+      </footer>
+
+      {/* ======================================================== */}
+      {/* MODALE D'ERREUR ACCESSIBLE */}
+      {/* ======================================================== */}
+      {activeModal === 'error' && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="error-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in"
+          onClick={() => setActiveModal('none')}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#ffdad6] text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-full bg-[#ffdad6] text-[#ba1a1a] flex items-center justify-center mx-auto mb-3">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <h3 id="error-modal-title" className="text-lg font-bold text-[#231919] mb-2">
+              Action requise
+            </h3>
+            <p className="text-sm text-[#565e74] mb-6 leading-relaxed">
+              {errorMessage || 'Une erreur est survenue lors de l’opération.'}
+            </p>
+            <button
+              type="button"
+              onClick={() => setActiveModal('none')}
+              className="w-full py-2.5 bg-[#231919] text-white rounded-xl text-sm font-semibold hover:bg-black transition-colors"
+            >
+              Compris
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODALE DE SUCCÈS & PAIEMENT ACCESSIBLE */}
+      {/* ======================================================== */}
+      {activeModal === 'success' && createdOrder && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="success-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in overflow-y-auto"
+          onClick={() => setActiveModal('none')}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-[#F6DEDC] my-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#F6DEDC] pb-3 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-[#FFF0EF] text-[#b7102a] flex items-center justify-center">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 id="success-modal-title" className="text-base font-bold text-[#231919]">
+                    Commande enregistrée !
                   </h3>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant">
-                    Lycée Jean Perrin • MDLE Opération Roses 2025
+                  <span className="text-xs text-[#565e74]">
+                    Réf : <strong>#{createdOrder.id.slice(0, 8).toUpperCase()}</strong>
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setActiveModal('none')}
+                className="text-[#565e74] hover:text-[#231919] p-1 rounded-lg"
+                aria-label="Fermer la modale"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Récapitulatif commande */}
+            <div className="bg-[#FFF8F7] rounded-xl p-4 border border-[#F6DEDC] text-xs sm:text-sm space-y-1.5 mb-6">
+              <div className="flex justify-between">
+                <span className="text-[#565e74]">Destinataire :</span>
+                <span className="font-semibold text-[#231919]">
+                  {createdOrder.recipient_name} ({createdOrder.recipient_class})
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#565e74]">Roses :</span>
+                <span className="font-semibold text-[#231919]">
+                  {createdOrder.red_roses_count + createdOrder.pink_roses_count} rose(s)
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#565e74]">Mot doux manuscrit :</span>
+                <span className="font-semibold text-[#231919]">
+                  {createdOrder.has_message ? 'Oui (+0,50 €)' : 'Non'}
+                </span>
+              </div>
+              <div className="flex justify-between pt-2 border-t border-[#F6DEDC] text-base font-bold">
+                <span>Total à régler :</span>
+                <span className="text-[#b7102a]">{createdOrder.total_amount.toFixed(2)} €</span>
+              </div>
+            </div>
+
+            {/* Cas 1 : Règlement Comptoir MDLE */}
+            {createdOrder.payment_method === 'mdle_counter' && (
+              <div className="space-y-4">
+                <div className="p-4 bg-[#FFF0EF] border border-[#F6DEDC] rounded-xl">
+                  <h4 className="font-bold text-sm text-[#b7102a] mb-1 flex items-center gap-1.5">
+                    <Coins className="w-4 h-4" /> Prochaine étape : Règlement au Foyer
+                  </h4>
+                  <p className="text-xs text-[#231919] leading-relaxed">
+                    Ta commande est réservée ! Rendez-vous au <strong>{COUNTER_LOCATION}</strong> muni de ta référence <strong>#{createdOrder.id.slice(0, 8).toUpperCase()}</strong> et de ton nom pour régler en espèces ou par carte bancaire.
+                  </p>
+                  <p className="text-xs font-bold text-[#ba1a1a] mt-2">
+                    ⚠️ Date limite impérative : {COUNTER_CLOSING_LABEL}.
                   </p>
                 </div>
 
-                {/* Amount breakdown in modal */}
-                <div className="bg-surface-container-low rounded-2xl p-space-md space-y-space-xs mb-space-md">
-                  <div className="flex justify-between font-body-sm text-body-sm text-on-surface-variant">
-                    <span>Destinataire :</span>
-                    <span className="font-medium text-on-surface">
-                      {recipientName} ({recipientClass})
-                    </span>
-                  </div>
-                  <div className="flex justify-between font-body-sm text-body-sm text-on-surface-variant">
-                    <span>Articles :</span>
-                    <span className="font-medium text-on-surface">
-                      {totalRoses} rose{totalRoses > 1 ? 's' : ''} ({redCount} rouge{redCount > 1 ? 's' : ''}, {pinkCount} rose{pinkCount > 1 ? 's' : ''})
-                      {hasMotDoux ? ' + mot doux' : ''}
-                    </span>
-                  </div>
-                  <div className="flex justify-between font-body-sm text-body-sm text-on-surface-variant">
-                    <span>Expéditeur :</span>
-                    <span className="font-medium text-on-surface">
-                      {isAnonymous ? 'Anonyme 🤫' : senderName || 'Non précisé'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between font-headline-sm text-headline-sm text-on-surface pt-1 border-t border-surface-container-high">
-                    <span className="font-bold">Montant Total</span>
-                    <span className="text-primary font-bold">{grandTotalFormatted}</span>
-                  </div>
-                </div>
+                <p className="text-xs text-[#565e74] text-center">
+                  Un e-mail récapitulatif contenant ta référence vient de t&apos;être envoyé.
+                </p>
 
-                {/* Actions : 100% Carte Bancaire SumUp ou Comptoir MDLE */}
-                {paymentMethod === 'sumup_online' ? (
-                  <div className="space-y-space-sm">
-                    <button
-                      onClick={() => handleConfirmOrder(true)}
-                      disabled={isSubmitting}
-                      className="w-full py-3.5 px-space-md rounded-2xl bg-primary text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 hover:bg-primary-container transition active:scale-98 cursor-pointer disabled:opacity-50 font-bold shadow-md"
-                      type="button"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">credit_card</span>
-                      <span>
-                        {isSubmitting ? 'Connexion sécurisée SumUp...' : 'Payer par Carte Bancaire (SumUp)'}
-                      </span>
-                    </button>
-                    <p className="text-center font-body-sm text-[11px] text-on-surface-variant">
-                      Paiement direct sécurisé par Carte Bancaire (CB, Visa, Mastercard)
+                <button
+                  type="button"
+                  onClick={() => setActiveModal('none')}
+                  className="w-full py-3 bg-[#b7102a] text-white rounded-xl text-sm font-bold hover:bg-[#9b0b21] transition-colors"
+                >
+                  J&apos;ai noté ma référence
+                </button>
+              </div>
+            )}
+
+            {/* Cas 2 : Carte Bancaire SumUp */}
+            {createdOrder.payment_method === 'sumup_online' && (
+              <div className="space-y-4">
+                {paymentCheckStatus === 'paid' ? (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-center">
+                    <CheckCircle2 className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                    <h4 className="font-bold text-sm text-green-800">Paiement confirmé par carte bancaire !</h4>
+                    <p className="text-xs text-green-700 mt-1">
+                      Votre commande est 100% validée. Elle sera remise en classe le {DELIVERY_DATE_LABEL}.
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-space-sm text-center">
-                    <div className="p-space-md rounded-2xl bg-tertiary-fixed/30 text-on-tertiary-fixed text-left space-y-1">
-                      <div className="font-label-md font-bold flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[16px]">pin_drop</span>
-                        Rendez-vous au foyer MDLE
-                      </div>
-                      <p className="font-body-sm text-body-sm">
-                        Présentez votre prénom aux délégués au foyer du lycée avant le <strong>jeudi 13 février 17h</strong> pour régler en pièces, billets ou carte bancaire.
+                  <div>
+                    <div className="p-4 bg-[#FFF0EF] border border-[#F6DEDC] rounded-xl mb-4">
+                      <h4 className="font-bold text-sm text-[#b7102a] mb-1 flex items-center gap-1.5">
+                        <CreditCard className="w-4 h-4" /> Finalisation du règlement par Carte Bancaire
+                      </h4>
+                      <p className="text-xs text-[#231919] leading-relaxed">
+                        Pour régler en ligne de façon sécurisée, accédez au formulaire SumUp ci-dessous. Dès réception de la confirmation, votre statut sera automatiquement mis à jour.
                       </p>
                     </div>
-                    <button
-                      onClick={() => handleConfirmOrder(false)}
-                      disabled={isSubmitting}
-                      className="w-full py-3.5 px-space-md rounded-2xl bg-primary text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 hover:bg-primary-container transition active:scale-98 cursor-pointer disabled:opacity-50 font-bold shadow-md"
-                      type="button"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">task_alt</span>
-                      <span>
-                        {isSubmitting ? 'Enregistrement...' : 'Valider ma réservation sans payer'}
-                      </span>
-                    </button>
+
+                    {/* Si checkout_id disponible, rediriger vers la page SumUp officielle */}
+                    {createdOrder.sumup_checkout_id && (
+                      <div className="space-y-3">
+                        <a
+                          href={`https://checkout.sumup.com/pay/${createdOrder.sumup_checkout_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full py-3.5 bg-[#b7102a] hover:bg-[#9b0b21] text-white rounded-xl text-sm font-bold text-center flex items-center justify-center gap-2 shadow-sm transition-all"
+                        >
+                          <CreditCard className="w-4 h-4" />
+                          Payer {createdOrder.total_amount.toFixed(2)} € sur SumUp
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+
+                        <button
+                          type="button"
+                          onClick={checkManualPaymentStatus}
+                          disabled={isCheckingPayment}
+                          className="w-full py-2.5 bg-white border border-[#F6DEDC] text-[#231919] hover:bg-[#FFF8F7] rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isCheckingPayment ? 'animate-spin' : ''}`} />
+                          Vérifier la confirmation de paiement
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
-                <p className="text-center font-label-sm text-label-sm text-on-surface-variant mt-space-md">
-                  MDLE Perrin • Transaction chiffrée SSL 256 bits
-                </p>
-              </>
-            ) : (
-              /* Success State */
-              <div className="text-center py-space-lg space-y-space-sm animate-in zoom-in-95 duration-200">
-                <div className="w-16 h-16 rounded-full bg-surface-container-high mx-auto flex items-center justify-center text-primary mb-2">
-                  <span className="material-symbols-outlined text-[36px]">check_circle</span>
-                </div>
-                <h4 className="font-headline-md text-headline-md text-on-surface font-bold">
-                  Commande Enregistrée !
-                </h4>
-                {createdOrder && (
-                  <div className="inline-block px-3 py-1 rounded-full bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant font-mono">
-                    Réf : #{createdOrder.id.slice(0, 8).toUpperCase()}
-                  </div>
-                )}
-                <p className="font-body-md text-body-md text-on-surface-variant max-w-xs mx-auto">
-                  {paymentMethod === 'sumup_online'
-                    ? 'Merci pour votre règlement par Carte Bancaire via SumUp ! La livraison aura lieu discrètement en classe le vendredi 14 février 2025.'
-                    : 'Votre réservation est validée ! N’oubliez pas de passer au Foyer MDLE régler votre commande avant le 13 février 17h.'}
-                </p>
-                <div className="pt-space-md">
-                  <button
-                    onClick={handleResetForm}
-                    className="w-full py-3 px-space-xl rounded-full bg-primary hover:bg-primary-container text-on-primary font-label-md text-label-md transition font-bold cursor-pointer"
-                    type="button"
-                  >
-                    Passer une autre commande
-                  </button>
-                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveModal('none')}
+                  className="w-full py-2.5 text-xs font-semibold text-[#565e74] hover:text-[#231919] text-center"
+                >
+                  Fermer cette fenêtre
+                </button>
               </div>
             )}
           </div>
         </div>
       )}
-
-      {/* Footer */}
-      <footer className="w-full bg-surface-container-lowest/90 py-space-lg shadow-[0_-1px_6px_rgba(0,0,0,0.02)] mt-12">
-        <div className="max-w-[1200px] mx-auto px-4 md:px-margin-desktop flex flex-col md:flex-row items-center justify-between gap-space-md">
-          <div className="flex items-center gap-space-sm font-body-sm text-body-sm text-on-surface-variant">
-            <span className="font-label-md text-label-md text-on-surface font-bold">MDLE Perrin</span>
-            <span>© 2025 Maison Des Lycéens</span>
-            <span className="hidden sm:inline">• Tous droits réservés</span>
-          </div>
-          <div className="flex items-center gap-space-lg font-label-sm text-label-sm text-on-surface-variant">
-            <a className="hover:text-on-surface transition-colors" href="#faq">
-              Règlement de livraison
-            </a>
-            <a
-              className="flex items-center gap-space-xs py-space-xs px-space-sm rounded-full bg-surface-container-low hover:bg-surface-container text-on-surface hover:text-on-surface transition-all"
-              href="/admin"
-              title="Accès Délégués & Administration"
-            >
-              <span className="material-symbols-outlined text-[16px]">lock</span>
-              <span>Espace MDLE</span>
-            </a>
-          </div>
-        </div>
-      </footer>
     </div>
   )
 }

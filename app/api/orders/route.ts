@@ -1,4 +1,15 @@
 import { NextResponse } from 'next/server'
+import {
+  COUNTER_CLOSING_LABEL,
+  MAX_ROSES,
+  OFFICIAL_CLASSES,
+  PRICE_MOT_DOUX,
+  PRICE_PER_ROSE,
+  isCounterOpen,
+  isSalesOpen,
+} from '@/lib/config'
+import { sendOrderConfirmationEmail } from '@/lib/email'
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 
 export const dynamic = 'force-dynamic'
@@ -11,62 +22,122 @@ type OrderRequestBody = {
   has_message?: boolean
   message_text?: string | null
   is_anonymous?: boolean
-  sender_name?: string | null
+  sender_name?: string
+  sender_email?: string
   payment_method?: 'sumup_online' | 'mdle_counter'
+  // Champ honeypot invisible anti-spam
+  website?: string
+  fax?: string
 }
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as OrderRequestBody
+    const clientIp = getClientIp(request)
 
-    // Assainissement strict des entrées texte
+    // 1. Limitation de débit anti-abus (20 commandes par 15 minutes par IP)
+    const rateLimit = checkRateLimit('orders_submission', clientIp, 20, 15 * 60 * 1000)
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: 'Trop de commandes passées depuis cette connexion. Veuillez patienter quelques minutes.' },
+        { status: 429 }
+      )
+    }
+
+    const body = (await request.json().catch(() => ({}))) as OrderRequestBody
+
+    // 2. Détection du piège honeypot anti-bots
+    if (body.website || body.fax) {
+      console.warn(`[Anti-Spam] Honeypot déclenché par IP ${clientIp}`)
+      return NextResponse.json({ error: 'Validation impossible.' }, { status: 400 })
+    }
+
+    // 3. Vérification de la fenêtre de vente officielle
+    if (!isSalesOpen()) {
+      return NextResponse.json(
+        { error: 'La période de commande des roses pour la Saint-Valentin 2027 est actuellement fermée.' },
+        { status: 403 }
+      )
+    }
+
+    const payment_method = body.payment_method === 'sumup_online' ? 'sumup_online' : 'mdle_counter'
+
+    // 4. Vérification de la fermeture du comptoir MDLE pour les espèces
+    if (payment_method === 'mdle_counter' && !isCounterOpen()) {
+      return NextResponse.json(
+        {
+          error: `Le règlement au Foyer MDLE est clôturé depuis le ${COUNTER_CLOSING_LABEL}. Veuillez choisir le règlement sécurisé par Carte Bancaire en ligne.`,
+        },
+        { status: 403 }
+      )
+    }
+
+    // 5. Validation et assainissement des entrées
     const recipient_name = (body.recipient_name || '').trim().slice(0, 100)
     const recipient_class = (body.recipient_class || '').trim().slice(0, 50)
+    const sender_name = (body.sender_name || '').trim().slice(0, 100)
+    const sender_email = (body.sender_email || '').trim().toLowerCase().slice(0, 150)
+
+    if (!recipient_name) {
+      return NextResponse.json({ error: 'Le prénom et nom du destinataire sont obligatoires.' }, { status: 400 })
+    }
+
+    if (!recipient_class) {
+      return NextResponse.json({ error: 'La classe du destinataire est obligatoire.' }, { status: 400 })
+    }
+
+    // Vérification de la classe par rapport à la liste officielle
+    const isOfficialClass = (OFFICIAL_CLASSES as readonly string[]).includes(recipient_class)
+    const isCustomOther = recipient_class.startsWith('Autre')
+    if (!isOfficialClass && !isCustomOther) {
+      return NextResponse.json(
+        { error: 'Veuillez sélectionner une classe valide dans la liste officielle.' },
+        { status: 400 }
+      )
+    }
+
+    if (!sender_name) {
+      return NextResponse.json({ error: 'Ton prénom et nom sont obligatoires.' }, { status: 400 })
+    }
+
+    if (!sender_email || !EMAIL_REGEX.test(sender_email)) {
+      return NextResponse.json(
+        { error: 'Une adresse e-mail valide est obligatoire pour recevoir ton reçu et la confirmation.' },
+        { status: 400 }
+      )
+    }
+
+    // Quantités de roses
     const red_roses_count = Math.max(0, parseInt(String(body.red_roses_count || 0), 10) || 0)
     const pink_roses_count = Math.max(0, parseInt(String(body.pink_roses_count || 0), 10) || 0)
     const totalRoses = red_roses_count + pink_roses_count
 
-    if (!recipient_name) {
-      return NextResponse.json(
-        { error: 'Le prénom et nom du destinataire sont obligatoires.' },
-        { status: 400 }
-      )
-    }
-    if (!recipient_class) {
-      return NextResponse.json(
-        { error: 'La classe ou la salle du destinataire est obligatoire.' },
-        { status: 400 }
-      )
-    }
     if (totalRoses < 1) {
-      return NextResponse.json(
-        { error: 'Vous devez commander au moins une rose (rouge ou rose).' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Vous devez choisir au moins une rose (rouge ou rose).' }, { status: 400 })
     }
-    if (totalRoses > 50) {
+
+    if (totalRoses > MAX_ROSES) {
       return NextResponse.json(
-        { error: 'Le volume maximal autorisé est de 50 roses par commande.' },
+        { error: `Le volume maximal autorisé est de ${MAX_ROSES} roses par commande.` },
         { status: 400 }
       )
     }
 
+    // Mot doux
     const has_message = Boolean(body.has_message)
     const rawMessage = (body.message_text || '').trim()
     const message_text = has_message ? rawMessage.slice(0, 200) || null : null
 
+    // Anonymat : le destinataire ne verra pas le nom, MAIS la MDLE conserve TOUJOURS sender_name
     const is_anonymous = Boolean(body.is_anonymous)
-    const rawSender = (body.sender_name || '').trim().slice(0, 100)
-    const sender_name = is_anonymous ? null : (rawSender || null)
 
-    const payment_method = body.payment_method === 'sumup_online' ? 'sumup_online' : 'mdle_counter'
-
-    // Calcul garanti et déterministe côté serveur : 2,00 € / rose + (0,50 € si mot doux)
-    const total_amount = Number(((totalRoses * 2.00) + (has_message ? 0.50 : 0)).toFixed(2))
+    // 6. Calcul déterministe strict côté serveur
+    const total_amount = Number(((totalRoses * PRICE_PER_ROSE) + (has_message ? PRICE_MOT_DOUX : 0)).toFixed(2))
 
     const supabase = getSupabaseAdmin()
 
-    // Enregistrement initial dans Supabase (roses_orders)
+    // 7. Enregistrement dans Supabase (roses_orders)
     const { data: order, error: insertError } = await supabase
       .from('roses_orders')
       .insert({
@@ -77,7 +148,8 @@ export async function POST(request: Request) {
         has_message,
         message_text,
         is_anonymous,
-        sender_name,
+        sender_name, // Toujours stocké en base
+        sender_email,
         total_amount,
         payment_method,
         payment_status: 'pending',
@@ -88,14 +160,14 @@ export async function POST(request: Request) {
     if (insertError || !order) {
       console.error('Erreur Supabase insertion commande :', insertError)
       return NextResponse.json(
-        { error: 'Impossible d’enregistrer la commande dans la base de données. Réessayez plus tard.' },
+        { error: 'Impossible d’enregistrer la commande dans la base de données. Réessayez dans un instant.' },
         { status: 500 }
       )
     }
 
     let sumupCheckoutId: string | null = null
 
-    // Intégration SumUp Checkout API (100% Carte Bancaire, sans Apple Pay / Google Pay)
+    // 8. Intégration SumUp Checkout API (Carte Bancaire uniquement)
     if (payment_method === 'sumup_online') {
       const apiKey = process.env.SUMUP_API_KEY
       const merchantCode = process.env.SUMUP_MERCHANT_CODE
@@ -113,7 +185,7 @@ export async function POST(request: Request) {
               amount: total_amount,
               currency: 'EUR',
               merchant_code: merchantCode,
-              description: `Roses St-Valentin MDLE (${totalRoses} roses - ${recipient_name})`,
+              description: `Roses St-Valentin 2027 MDLE (${totalRoses} roses)`,
               payment_type: 'card', // Carte Bancaire uniquement
             }),
           })
@@ -129,24 +201,68 @@ export async function POST(request: Request) {
             }
           } else {
             const errBody = await sumupResponse.text()
-            console.warn('SumUp API Checkout création non-OK :', errBody)
+            console.error('Erreur création checkout SumUp API :', errBody)
+            if (process.env.NODE_ENV === 'production') {
+              return NextResponse.json(
+                { error: 'Échec de connexion avec la plateforme de paiement SumUp. Veuillez réessayer ou payer au Foyer.' },
+                { status: 502 }
+              )
+            }
           }
         } catch (sumupErr) {
-          console.error('Erreur de communication avec l’API SumUp :', sumupErr)
+          console.error('Exception appel SumUp API :', sumupErr)
+          if (process.env.NODE_ENV === 'production') {
+            return NextResponse.json(
+              { error: 'Service de paiement en ligne temporairement inaccessible.' },
+              { status: 503 }
+            )
+          }
         }
-      }
-
-      // Mode dégradé / sandbox : si les clés SumUp ne sont pas configurées en local
-      if (!sumupCheckoutId) {
-        sumupCheckoutId = `chk_sim_${order.id}`
+      } else {
+        if (process.env.NODE_ENV === 'production') {
+          console.error('SUMUP_API_KEY ou SUMUP_MERCHANT_CODE manquant en production.')
+          return NextResponse.json(
+            { error: 'Configuration du paiement par carte incomplète sur le serveur.' },
+            { status: 500 }
+          )
+        }
+        console.warn('Mode dev : clés SumUp non renseignées. Checkout simulé localement.')
+        sumupCheckoutId = `dev_chk_${order.id}`
       }
     }
+
+    // 9. Envoi de l'e-mail de confirmation en arrière-plan
+    sendOrderConfirmationEmail({
+      id: order.id,
+      sender_name,
+      sender_email,
+      recipient_name,
+      recipient_class,
+      red_roses_count,
+      pink_roses_count,
+      has_message,
+      total_amount,
+      payment_method,
+      payment_status: 'pending',
+      unsubscribe_token: order.unsubscribe_token,
+    }).catch((emailErr) => {
+      console.error('Erreur non bloquante envoi e-mail confirmation :', emailErr)
+    })
 
     return NextResponse.json(
       {
         success: true,
         order: {
-          ...order,
+          id: order.id,
+          total_amount,
+          payment_method,
+          payment_status: 'pending',
+          recipient_name,
+          recipient_class,
+          red_roses_count,
+          pink_roses_count,
+          has_message,
+          created_at: order.created_at,
           sumup_checkout_id: sumupCheckoutId,
         },
         checkout_id: sumupCheckoutId,
@@ -154,10 +270,7 @@ export async function POST(request: Request) {
       { status: 201 }
     )
   } catch (error) {
-    console.error('Erreur traitement commande API /orders :', error)
-    return NextResponse.json(
-      { error: 'Données de formulaire invalides ou erreur interne du serveur.' },
-      { status: 400 }
-    )
+    console.error('Erreur POST /api/orders :', error)
+    return NextResponse.json({ error: 'Requête invalide ou erreur interne.' }, { status: 400 })
   }
 }

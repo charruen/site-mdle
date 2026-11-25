@@ -1,11 +1,11 @@
 {
-  "name": "MDLE Jean Perrin",
-  "short_name": "MDLE",
-  "description": "L'application de la Maison des Lycéens et des Étudiants du Lycée Jean Perrin — Foyer, cafétéria, événements et projets.",
+  "name": "Roses Saint-Valentin 2027 • MDLE Lycée Jean Perrin",
+  "short_name": "MDLE Roses",
+  "description": "Opération officielle de vente de roses de la Saint-Valentin par la Maison Des Lycéens du Lycée Jean Perrin.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FAFAF8",
-  "theme_color": "#1B2A4A",
+  "background_color": "#FFF8F7",
+  "theme_color": "#b7102a",
   "orientation": "portrait-primary",
   "lang": "fr",
   "categories": ["lifestyle", "education"],
@@ -21,19 +21,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
-    }
-  ],
-  "screenshots": [],
-  "shortcuts": [
-    {
-      "name": "La Carte",
-      "url": "/#carte",
-      "description": "Accéder à la carte de la cafétéria"
-    },
-    {
-      "name": "Agenda",
-      "url": "/#agenda",
-      "description": "Voir les événements à venir"
     }
   ]
 }
