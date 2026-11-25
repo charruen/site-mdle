@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import {
   COUNTER_CLOSING_LABEL,
   MAX_ROSES,
-  OFFICIAL_CLASSES,
   PRICE_MOT_DOUX,
   PRICE_PER_ROSE,
   isCounterOpen,
@@ -88,16 +87,6 @@ export async function POST(request: Request) {
 
     if (!recipient_class) {
       return NextResponse.json({ error: 'La classe du destinataire est obligatoire.' }, { status: 400 })
-    }
-
-    // Vérification de la classe par rapport à la liste officielle
-    const isOfficialClass = (OFFICIAL_CLASSES as readonly string[]).includes(recipient_class)
-    const isCustomOther = recipient_class.startsWith('Autre')
-    if (!isOfficialClass && !isCustomOther) {
-      return NextResponse.json(
-        { error: 'Veuillez sélectionner une classe valide dans la liste officielle.' },
-        { status: 400 }
-      )
     }
 
     if (!sender_name) {

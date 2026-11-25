@@ -16,7 +16,6 @@ import {
   ShieldCheck,
   HelpCircle,
   X,
-  ChevronDown,
   Calendar,
   MapPin,
   User,
@@ -36,7 +35,6 @@ import {
   PRICE_PER_ROSE,
   PRICE_MOT_DOUX,
   MAX_ROSES,
-  OFFICIAL_CLASSES,
   CONTACT_EMAIL,
   MDLE_INSTAGRAM,
   isSalesOpen,
@@ -71,8 +69,7 @@ export default function HomePage() {
 
   // Destinataire
   const [recipientName, setRecipientName] = useState('')
-  const [recipientClass, setRecipientClass] = useState<string>(OFFICIAL_CLASSES[0])
-  const [customClass, setCustomClass] = useState('')
+  const [recipientClass, setRecipientClass] = useState<string>('')
 
   // Expéditeur
   const [senderName, setSenderName] = useState('')
@@ -233,7 +230,7 @@ export default function HomePage() {
       return
     }
 
-    const effectiveClass = recipientClass === 'Autre' ? customClass.trim() : recipientClass
+    const effectiveClass = recipientClass.trim()
     if (!effectiveClass) {
       setErrorMessage('Veuillez préciser la classe du destinataire.')
       setActiveModal('error')
@@ -597,46 +594,21 @@ export default function HomePage() {
 
               <div>
                 <label htmlFor="recipient_class" className="block text-xs font-bold text-[#231919] mb-1.5">
-                  Classe ou statut <span className="text-[#ba1a1a]">*</span>
-                </label>
-                <div className="relative">
-                  <select
-                    id="recipient_class"
-                    required
-                    value={recipientClass}
-                    onChange={(e) => setRecipientClass(e.target.value)}
-                    disabled={!salesAreOpen}
-                    className="w-full text-sm px-3 py-2.5 rounded-xl border border-[#F6DEDC] bg-[#FFF8F7] text-[#231919] focus:bg-white appearance-none"
-                  >
-                    {OFFICIAL_CLASSES.map((cls) => (
-                      <option key={cls} value={cls}>
-                        {cls}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-[#565e74] absolute right-3 top-3 pointer-events-none" />
-                </div>
-              </div>
-            </div>
-
-            {recipientClass === 'Autre' && (
-              <div className="mt-3">
-                <label htmlFor="custom_class" className="block text-xs font-bold text-[#231919] mb-1.5">
-                  Précisez la salle, le service ou la localisation <span className="text-[#ba1a1a]">*</span>
+                  Classe du destinataire <span className="text-[#ba1a1a]">*</span>
                 </label>
                 <input
-                  id="custom_class"
+                  id="recipient_class"
                   type="text"
                   required
-                  maxLength={50}
-                  value={customClass}
-                  onChange={(e) => setCustomClass(e.target.value)}
+                  maxLength={30}
+                  value={recipientClass}
+                  onChange={(e) => setRecipientClass(e.target.value)}
                   disabled={!salesAreOpen}
-                  placeholder="Ex: Salle des professeurs, Vie scolaire, Bâtiment B..."
+                  placeholder="Ex : TG3, 1ES2, 2nde 5…"
                   className="w-full text-sm px-3 py-2.5 rounded-xl border border-[#F6DEDC] bg-[#FFF8F7] text-[#231919] placeholder:text-[#8f6f6e] focus:bg-white"
                 />
               </div>
-            )}
+            </div>
           </section>
 
           {/* SECTION 4 : EXPÉDITEUR & ANONYMAT */}

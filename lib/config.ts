@@ -28,7 +28,7 @@ export const PRICE_MOT_DOUX = 0.50
 export const MAX_ROSES = 20
 
 // Horaires et localisation du comptoir Foyer MDLE
-export const COUNTER_LOCATION = 'Foyer des élèves (Bâtiment C)'
+export const COUNTER_LOCATION = 'comptoir de la MDLE (Bâtiment C)'
 export const COUNTER_HOURS = 'Tous les midis de 12h00 à 13h45 & récréations'
 export const COUNTER_CLOSING_LABEL = 'Vendredi 22 janvier 2027 à 17h30'
 
