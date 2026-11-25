@@ -73,7 +73,7 @@ export async function POST(request: Request) {
 
     if (!success) {
       return NextResponse.json(
-        { error: 'Échec d’envoi de l’e-mail via le service Resend. Vérifiez la configuration RESEND_API_KEY.' },
+        { error: 'Échec d’envoi de l’e-mail via Gmail. Vérifiez GMAIL_USER et GMAIL_APP_PASSWORD.' },
         { status: 502 }
       )
     }

@@ -1,4 +1,4 @@
-import { Resend } from 'resend'
+import nodemailer from 'nodemailer'
 import {
   CONTACT_EMAIL,
   COUNTER_CLOSING_LABEL,
@@ -8,16 +8,44 @@ import {
   EDITION_YEAR,
 } from './config'
 
-function getResendClient(): Resend | null {
-  const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey) {
+function getGmailCredentials(): { user: string; pass: string } | null {
+  const user = (process.env.GMAIL_USER || CONTACT_EMAIL).trim()
+  // Les mots de passe d'application Google contiennent souvent des espaces : on les supprime automatiquement
+  const pass = (process.env.GMAIL_APP_PASSWORD || '').replace(/\s+/g, '')
+  if (!user || !pass) {
     return null
   }
-  return new Resend(apiKey)
+  return { user, pass }
 }
 
-function getSenderEmail(): string {
-  return process.env.EMAIL_FROM || `MDLE Lycée Jean Perrin <${CONTACT_EMAIL}>`
+async function sendGmail({ to, subject, html }: { to: string; subject: string; html: string }): Promise<boolean> {
+  const creds = getGmailCredentials()
+  if (!creds) {
+    console.warn('[Email] GMAIL_APP_PASSWORD non configurée. E-mail non envoyé.')
+    return false
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: creds.user,
+        pass: creds.pass,
+      },
+    })
+
+    await transporter.sendMail({
+      from: `MDLE Lycée Jean Perrin <${creds.user}>`,
+      replyTo: CONTACT_EMAIL,
+      to,
+      subject,
+      html,
+    })
+    return true
+  } catch (err) {
+    console.error('[Email] Erreur envoi Gmail SMTP :', err)
+    return false
+  }
 }
 
 function resolveRecipientEmail(originalEmail: string): string {
@@ -55,12 +83,6 @@ type OrderEmailData = {
  * E-mail de confirmation de commande
  */
 export async function sendOrderConfirmationEmail(order: OrderEmailData): Promise<boolean> {
-  const resend = getResendClient()
-  if (!resend) {
-    console.warn('[Email] RESEND_API_KEY non configurée. E-mail de confirmation non envoyé.')
-    return false
-  }
-
   const to = resolveRecipientEmail(order.sender_email)
   const shortId = order.id.slice(0, 8).toUpperCase()
   const baseUrl = getBaseUrl()
@@ -165,31 +187,13 @@ export async function sendOrderConfirmationEmail(order: OrderEmailData): Promise
 </html>
   `
 
-  try {
-    const { error } = await resend.emails.send({
-      from: getSenderEmail(),
-      to: [to],
-      subject,
-      html,
-    })
-    if (error) {
-      console.error('[Email] Erreur envoi confirmation Resend :', error)
-      return false
-    }
-    return true
-  } catch (err) {
-    console.error('[Email] Exception envoi confirmation Resend :', err)
-    return false
-  }
+  return sendGmail({ to, subject, html })
 }
 
 /**
  * E-mail de relance automatique (Comptoir ou Carte)
  */
 export async function sendReminderEmail(order: OrderEmailData, daysRemaining: number, isLastDay: boolean): Promise<boolean> {
-  const resend = getResendClient()
-  if (!resend) return false
-
   const to = resolveRecipientEmail(order.sender_email)
   const shortId = order.id.slice(0, 8).toUpperCase()
   const baseUrl = getBaseUrl()
@@ -268,27 +272,13 @@ export async function sendReminderEmail(order: OrderEmailData, daysRemaining: nu
 </html>
   `
 
-  try {
-    const { error } = await resend.emails.send({
-      from: getSenderEmail(),
-      to: [to],
-      subject,
-      html,
-    })
-    return !error
-  } catch (err) {
-    console.error('[Email] Erreur envoi relance :', err)
-    return false
-  }
+  return sendGmail({ to, subject, html })
 }
 
 /**
  * E-mail d'annulation / expiration de commande non réglée
  */
 export async function sendOrderExpiredEmail(order: OrderEmailData): Promise<boolean> {
-  const resend = getResendClient()
-  if (!resend) return false
-
   const to = resolveRecipientEmail(order.sender_email)
   const shortId = order.id.slice(0, 8).toUpperCase()
 
@@ -324,18 +314,7 @@ export async function sendOrderExpiredEmail(order: OrderEmailData): Promise<bool
 </html>
   `
 
-  try {
-    const { error } = await resend.emails.send({
-      from: getSenderEmail(),
-      to: [to],
-      subject,
-      html,
-    })
-    return !error
-  } catch (err) {
-    console.error('[Email] Erreur envoi expiration :', err)
-    return false
-  }
+  return sendGmail({ to, subject, html })
 }
 
 function escapeHtml(str: string): string {
