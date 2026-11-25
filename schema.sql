@@ -5,6 +5,7 @@
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+-- Table des commandes
 CREATE TABLE IF NOT EXISTS public.roses_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMPTZ DEFAULT timezone('Europe/Paris'::text, now()) NOT NULL,
@@ -48,17 +49,25 @@ CREATE INDEX IF NOT EXISTS idx_roses_orders_recipient_class ON public.roses_orde
 CREATE INDEX IF NOT EXISTS idx_roses_orders_sumup_checkout ON public.roses_orders(sumup_checkout_id);
 CREATE INDEX IF NOT EXISTS idx_roses_orders_unsubscribe_token ON public.roses_orders(unsubscribe_token);
 
+-- Table des paramètres système (Mode testeur, etc.)
+CREATE TABLE IF NOT EXISTS public.app_settings (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT timezone('Europe/Paris'::text, now()) NOT NULL
+);
+
 -- Activation stricte de Row Level Security (RLS)
 ALTER TABLE public.roses_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
 
 -- Suppression de toute ancienne politique
 DO $$
 DECLARE
   pol record;
 BEGIN
-  FOR pol IN SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = 'roses_orders'
+  FOR pol IN SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename IN ('roses_orders', 'app_settings')
   LOOP
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.roses_orders', pol.policyname);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, pol.tablename);
   END LOOP;
 END
 $$;
@@ -66,3 +75,4 @@ $$;
 -- Révocation de TOUS les accès directs pour anon et authenticated
 -- Les données personnelles et commandes transitent EXCLUSIVEMENT par le backend Next.js via le service_role
 REVOKE ALL ON public.roses_orders FROM anon, authenticated;
+REVOKE ALL ON public.app_settings FROM anon, authenticated;

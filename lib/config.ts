@@ -32,9 +32,9 @@ export const COUNTER_LOCATION = 'Foyer des élèves (Bâtiment C)'
 export const COUNTER_HOURS = 'Tous les midis de 12h00 à 13h45 & récréations'
 export const COUNTER_CLOSING_LABEL = 'Vendredi 22 janvier 2027 à 17h30'
 
-// Contact officiel
-export const CONTACT_EMAIL = 'contact@mdle-jeanperrin.fr'
-export const MDLE_INSTAGRAM = '@mdle_jeanperrin'
+// Contact officiel MDLE Jean Perrin
+export const CONTACT_EMAIL = 'mdle.jeanperrin.marseille@gmail.com'
+export const MDLE_INSTAGRAM = 'mdle.perrin'
 
 // Liste officielle des classes du Lycée Jean Perrin pour le sélecteur
 export const OFFICIAL_CLASSES = [
@@ -84,14 +84,14 @@ export const OFFICIAL_CLASSES = [
 export type OfficialClass = (typeof OFFICIAL_CLASSES)[number]
 
 /**
- * Permet de forcer l'ouverture des ventes en environnement de développement ou de test.
+ * Permet de forcer l'ouverture des ventes via variable d'environnement
  */
 export function isOrdersOpenOverride(): boolean {
   return process.env.ORDERS_OPEN_OVERRIDE === 'true' || process.env.NEXT_PUBLIC_ORDERS_OPEN_OVERRIDE === 'true'
 }
 
 /**
- * Vérifie si la période de vente est en cours.
+ * Vérifie si la période de vente est en cours selon le calendrier officiel.
  */
 export function isSalesOpen(now: Date = new Date()): boolean {
   if (isOrdersOpenOverride()) return true

@@ -92,19 +92,38 @@ export default function HomePage() {
   const [createdOrder, setCreatedOrder] = useState<CreatedOrder | null>(null)
   const [paymentCheckStatus, setPaymentCheckStatus] = useState<string>('pending')
   const [isCheckingPayment, setIsCheckingPayment] = useState(false)
+  const [isSimulatingPayment, setIsSimulatingPayment] = useState(false)
+
+  // Mode testeur activable depuis le portail admin
+  const [isTestMode, setIsTestMode] = useState(false)
 
   // Compte à rebours temps réel
   const [now, setNow] = useState<Date>(new Date())
+
+  useEffect(() => {
+    let isMounted = true
+    fetch('/api/settings/test-mode')
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted && data.testMode) {
+          setIsTestMode(true)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
 
-  const salesAreOpen = isSalesOpen(now)
-  const beforeSales = isBeforeSales(now)
-  const salesClosed = isSalesClosed(now)
-  const counterIsOpen = isCounterOpen(now)
+  const salesAreOpen = isSalesOpen(now) || isTestMode
+  const beforeSales = isBeforeSales(now) && !isTestMode
+  const salesClosed = isSalesClosed(now) && !isTestMode
+  const counterIsOpen = isCounterOpen(now) || isTestMode
 
   // Détermination du mode de règlement effectif
   const effectivePaymentMethod = (!counterIsOpen && paymentMethod === 'mdle_counter') ? 'sumup_online' : paymentMethod
@@ -166,6 +185,23 @@ export default function HomePage() {
       // Ignoré
     } finally {
       setIsCheckingPayment(false)
+    }
+  }
+
+  async function handleSimulatePayment() {
+    if (!createdOrder) return
+    setIsSimulatingPayment(true)
+    try {
+      const res = await fetch(`/api/orders/${createdOrder.id}/simulate-payment`, {
+        method: 'POST',
+      })
+      if (res.ok) {
+        setPaymentCheckStatus('paid')
+      }
+    } catch {
+      // Ignoré
+    } finally {
+      setIsSimulatingPayment(false)
     }
   }
 
@@ -259,6 +295,16 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FFF8F7] text-[#231919]">
+      {/* Bannière Mode Testeur si activé depuis l'administration */}
+      {isTestMode && (
+        <div className="bg-amber-500 text-amber-950 font-bold px-4 py-2 text-center text-xs flex items-center justify-center gap-2 shadow-inner z-40">
+          <Sparkles className="w-4 h-4 shrink-0 text-amber-900" />
+          <span>
+            Mode Testeur Actif (Activé par l&apos;Administration MDLE) — Vous pouvez tester l&apos;intégralité du tunnel de commande en direct.
+          </span>
+        </div>
+      )}
+
       {/* En-tête / Bannière officielle */}
       <header className="bg-white border-b border-[#F6DEDC] sticky top-0 z-30 shadow-xs">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
@@ -681,11 +727,10 @@ export default function HomePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Carte bancaire en ligne */}
               <label
-                className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                  effectivePaymentMethod === 'sumup_online'
-                    ? 'border-[#b7102a] bg-[#FFF8F7]'
-                    : 'border-[#F6DEDC] bg-white hover:bg-[#FFF8F7]'
-                }`}
+                className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${effectivePaymentMethod === 'sumup_online'
+                  ? 'border-[#b7102a] bg-[#FFF8F7]'
+                  : 'border-[#F6DEDC] bg-white hover:bg-[#FFF8F7]'
+                  }`}
               >
                 <input
                   type="radio"
@@ -709,13 +754,12 @@ export default function HomePage() {
 
               {/* Foyer MDLE Comptoir */}
               <label
-                className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all ${
-                  !counterIsOpen
-                    ? 'opacity-50 cursor-not-allowed border-[#F6DEDC] bg-gray-50'
-                    : effectivePaymentMethod === 'mdle_counter'
+                className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all ${!counterIsOpen
+                  ? 'opacity-50 cursor-not-allowed border-[#F6DEDC] bg-gray-50'
+                  : effectivePaymentMethod === 'mdle_counter'
                     ? 'border-[#b7102a] bg-[#FFF8F7] cursor-pointer'
                     : 'border-[#F6DEDC] bg-white hover:bg-[#FFF8F7] cursor-pointer'
-                }`}
+                  }`}
               >
                 <input
                   type="radio"
@@ -838,7 +882,14 @@ export default function HomePage() {
               {CONTACT_EMAIL}
             </a>{' '}
             ou via Instagram{' '}
-            <span className="font-semibold text-[#231919]">{MDLE_INSTAGRAM}</span>.
+            <a
+              href={`https://instagram.com/${MDLE_INSTAGRAM}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-[#b7102a] hover:underline"
+            >
+              @{MDLE_INSTAGRAM}
+            </a>.
           </div>
         </section>
       </main>
@@ -1039,19 +1090,37 @@ export default function HomePage() {
                       </p>
                     </div>
 
-                    {/* Si checkout_id disponible, rediriger vers la page SumUp officielle */}
+                    {/* Boutons de paiement SumUp réel ou simulation en Mode Testeur */}
                     {createdOrder.sumup_checkout_id && (
                       <div className="space-y-3">
-                        <a
-                          href={`https://checkout.sumup.com/pay/${createdOrder.sumup_checkout_id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full py-3.5 bg-[#b7102a] hover:bg-[#9b0b21] text-white rounded-xl text-sm font-bold text-center flex items-center justify-center gap-2 shadow-sm transition-all"
-                        >
-                          <CreditCard className="w-4 h-4" />
-                          Payer {createdOrder.total_amount.toFixed(2)} € sur SumUp
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
+                        {!createdOrder.sumup_checkout_id.startsWith('test_chk_') &&
+                        !createdOrder.sumup_checkout_id.startsWith('dev_') ? (
+                          <a
+                            href={`https://checkout.sumup.com/pay/${createdOrder.sumup_checkout_id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full py-3.5 bg-[#b7102a] hover:bg-[#9b0b21] text-white rounded-xl text-sm font-bold text-center flex items-center justify-center gap-2 shadow-sm transition-all"
+                          >
+                            <CreditCard className="w-4 h-4" />
+                            Payer {createdOrder.total_amount.toFixed(2)} € sur SumUp
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        ) : null}
+
+                        {/* Option de simulation immédiate en mode testeur */}
+                        {(isTestMode ||
+                          createdOrder.sumup_checkout_id.startsWith('test_chk_') ||
+                          createdOrder.sumup_checkout_id.startsWith('dev_')) && (
+                          <button
+                            type="button"
+                            onClick={handleSimulatePayment}
+                            disabled={isSimulatingPayment}
+                            className="w-full py-3.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-bold text-center flex items-center justify-center gap-2 shadow-sm transition-all"
+                          >
+                            <Sparkles className="w-4 h-4" />
+                            {isSimulatingPayment ? 'Validation du test...' : 'Simuler un paiement CB validé (Test)'}
+                          </button>
+                        )}
 
                         <button
                           type="button"

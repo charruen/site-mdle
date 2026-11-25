@@ -1,5 +1,5 @@
 -- ========================================================
--- MIGRATION 2027-01-01 : INITIALISATION TABLE ROSES 2027
+-- MIGRATION 2027-01-01 : INITIALISATION TABLE ROSES & SETTINGS 2027
 -- MDLE Lycée Jean Perrin
 -- ========================================================
 
@@ -35,17 +35,25 @@ CREATE INDEX IF NOT EXISTS idx_roses_orders_recipient_class ON public.roses_orde
 CREATE INDEX IF NOT EXISTS idx_roses_orders_sumup_checkout ON public.roses_orders(sumup_checkout_id);
 CREATE INDEX IF NOT EXISTS idx_roses_orders_unsubscribe_token ON public.roses_orders(unsubscribe_token);
 
+CREATE TABLE IF NOT EXISTS public.app_settings (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT timezone('Europe/Paris'::text, now()) NOT NULL
+);
+
 ALTER TABLE public.roses_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
 
 DO $$
 DECLARE
   pol record;
 BEGIN
-  FOR pol IN SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = 'roses_orders'
+  FOR pol IN SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename IN ('roses_orders', 'app_settings')
   LOOP
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.roses_orders', pol.policyname);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, pol.tablename);
   END LOOP;
 END
 $$;
 
 REVOKE ALL ON public.roses_orders FROM anon, authenticated;
+REVOKE ALL ON public.app_settings FROM anon, authenticated;

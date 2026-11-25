@@ -104,6 +104,10 @@ export default function AdminRosesComponent() {
   const [isDryRunLoading, setIsDryRunLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'table' | 'distribution'>('table')
 
+  // Mode Testeur activable depuis l'admin
+  const [testMode, setTestMode] = useState<boolean>(false)
+  const [isTogglingTestMode, setIsTogglingTestMode] = useState(false)
+
   // Fetch orders helper
   const fetchOrders = useCallback(async () => {
     setLoadingOrders(true)
@@ -157,6 +161,16 @@ export default function AdminRosesComponent() {
         .finally(() => {
           if (isMounted) setLoadingOrders(false)
         })
+
+      // Récupération de l'état du mode testeur
+      fetch('/api/admin/settings', { cache: 'no-store' })
+        .then((res) => res.json())
+        .then((data) => {
+          if (isMounted && typeof data.testMode === 'boolean') {
+            setTestMode(data.testMode)
+          }
+        })
+        .catch(() => { })
     }
     return () => {
       isMounted = false
@@ -279,10 +293,10 @@ export default function AdminRosesComponent() {
           prev.map((o) =>
             o.id === orderId
               ? {
-                  ...o,
-                  reminders_count: (o.reminders_count || 0) + 1,
-                  last_reminder_at: new Date().toISOString(),
-                }
+                ...o,
+                reminders_count: (o.reminders_count || 0) + 1,
+                last_reminder_at: new Date().toISOString(),
+              }
               : o
           )
         )
@@ -356,6 +370,34 @@ export default function AdminRosesComponent() {
       showNotification('Erreur réseau lors du dry-run.', 'error')
     } finally {
       setIsDryRunLoading(false)
+    }
+  }
+
+  // Toggle Test Mode (Boutique ouverte hors période)
+  const handleToggleTestMode = async () => {
+    setIsTogglingTestMode(true)
+    const nextVal = !testMode
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ testMode: nextVal }),
+      })
+      if (res.ok) {
+        setTestMode(nextVal)
+        showNotification(
+          nextVal
+            ? 'Mode Testeur ACTIVÉ : la boutique publique est ouverte aux commandes tests !'
+            : 'Mode Testeur DÉSACTIVÉ : la boutique suit le calendrier officiel.',
+          'success'
+        )
+      } else {
+        showNotification('Impossible de modifier le mode testeur.', 'error')
+      }
+    } catch {
+      showNotification('Erreur réseau.', 'error')
+    } finally {
+      setIsTogglingTestMode(false)
     }
   }
 
@@ -555,11 +597,10 @@ export default function AdminRosesComponent() {
       {/* Toast Notification */}
       {actionMessage && (
         <div
-          className={`fixed bottom-4 right-4 z-50 p-4 rounded-xl shadow-lg border text-xs font-bold flex items-center gap-2 transition-all no-print ${
-            actionMessage.type === 'success'
-              ? 'bg-green-50 text-green-900 border-green-200'
-              : 'bg-[#ffdad6] text-[#ba1a1a] border-[#ba1a1a]'
-          }`}
+          className={`fixed bottom-4 right-4 z-50 p-4 rounded-xl shadow-lg border text-xs font-bold flex items-center gap-2 transition-all no-print ${actionMessage.type === 'success'
+            ? 'bg-green-50 text-green-900 border-green-200'
+            : 'bg-[#ffdad6] text-[#ba1a1a] border-[#ba1a1a]'
+            }`}
         >
           {actionMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
           {actionMessage.text}
@@ -598,6 +639,24 @@ export default function AdminRosesComponent() {
             >
               <Download className="w-3.5 h-3.5 text-[#b7102a]" />
               Export CSV
+            </button>
+
+            {/* Bouton Toggle Mode Testeur */}
+            <button
+              onClick={handleToggleTestMode}
+              disabled={isTogglingTestMode}
+              className={`text-xs font-bold px-3 py-1.5 rounded-lg border flex items-center gap-1.5 transition-all ${testMode
+                ? 'bg-amber-100 text-amber-900 border-amber-300 ring-2 ring-amber-300'
+                : 'bg-[#FFF8F7] text-[#565e74] border-[#F6DEDC] hover:bg-[#FFF0EF]'
+                }`}
+              title={
+                testMode
+                  ? 'Mode testeur actif : cliquez pour désactiver et bloquer la boutique'
+                  : 'Cliquez pour activer le mode testeur et ouvrir la boutique immédiatement pour tester'
+              }
+            >
+              <span className={`w-2 h-2 rounded-full ${testMode ? 'bg-amber-500 animate-pulse' : 'bg-gray-400'}`} />
+              <span>Testeur : {testMode ? 'ACTIF' : 'Inactif'}</span>
             </button>
 
             <button
@@ -789,33 +848,29 @@ export default function AdminRosesComponent() {
             <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
               <button
                 onClick={() => setActiveFilter('all')}
-                className={`px-2.5 py-1.5 rounded-lg transition-colors ${
-                  activeFilter === 'all' ? 'bg-[#b7102a] text-white' : 'bg-[#FFF8F7] text-[#565e74] hover:bg-[#FFF0EF]'
-                }`}
+                className={`px-2.5 py-1.5 rounded-lg transition-colors ${activeFilter === 'all' ? 'bg-[#b7102a] text-white' : 'bg-[#FFF8F7] text-[#565e74] hover:bg-[#FFF0EF]'
+                  }`}
               >
                 Tous ({orders.length})
               </button>
               <button
                 onClick={() => setActiveFilter('paid')}
-                className={`px-2.5 py-1.5 rounded-lg transition-colors ${
-                  activeFilter === 'paid' ? 'bg-green-700 text-white' : 'bg-[#FFF8F7] text-[#565e74] hover:bg-[#FFF0EF]'
-                }`}
+                className={`px-2.5 py-1.5 rounded-lg transition-colors ${activeFilter === 'paid' ? 'bg-green-700 text-white' : 'bg-[#FFF8F7] text-[#565e74] hover:bg-[#FFF0EF]'
+                  }`}
               >
                 Payées ({paidOrders.length})
               </button>
               <button
                 onClick={() => setActiveFilter('pending')}
-                className={`px-2.5 py-1.5 rounded-lg transition-colors ${
-                  activeFilter === 'pending' ? 'bg-amber-700 text-white' : 'bg-[#FFF8F7] text-[#565e74] hover:bg-[#FFF0EF]'
-                }`}
+                className={`px-2.5 py-1.5 rounded-lg transition-colors ${activeFilter === 'pending' ? 'bg-amber-700 text-white' : 'bg-[#FFF8F7] text-[#565e74] hover:bg-[#FFF0EF]'
+                  }`}
               >
                 En attente ({pendingOrders.length})
               </button>
               <button
                 onClick={() => setActiveFilter('to_remind')}
-                className={`px-2.5 py-1.5 rounded-lg transition-colors ${
-                  activeFilter === 'to_remind' ? 'bg-[#b7102a] text-white' : 'bg-[#FFF8F7] text-[#565e74] hover:bg-[#FFF0EF]'
-                }`}
+                className={`px-2.5 py-1.5 rounded-lg transition-colors ${activeFilter === 'to_remind' ? 'bg-[#b7102a] text-white' : 'bg-[#FFF8F7] text-[#565e74] hover:bg-[#FFF0EF]'
+                  }`}
               >
                 À relancer
               </button>
@@ -963,11 +1018,10 @@ export default function AdminRosesComponent() {
                         <td className="py-3 px-2 text-center">
                           <button
                             onClick={() => handleToggleDelivered(order.id, order.delivered)}
-                            className={`p-1.5 rounded-lg transition-colors ${
-                              order.delivered
-                                ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                            }`}
+                            className={`p-1.5 rounded-lg transition-colors ${order.delivered
+                              ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                              : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                              }`}
                             title={order.delivered ? 'Marqué livré (cliquer pour annuler)' : 'Marquer comme livré'}
                           >
                             <PackageCheck className="w-4 h-4" />
@@ -989,9 +1043,8 @@ export default function AdminRosesComponent() {
                             )}
                             <button
                               onClick={() => handleToggleRemindersOptOut(order.id, order.reminders_opt_out)}
-                              className={`p-1 rounded ${
-                                order.reminders_opt_out ? 'text-amber-700 bg-amber-50' : 'text-gray-400 hover:text-gray-600'
-                              }`}
+                              className={`p-1 rounded ${order.reminders_opt_out ? 'text-amber-700 bg-amber-50' : 'text-gray-400 hover:text-gray-600'
+                                }`}
                               title={order.reminders_opt_out ? 'Relances en pause (cliquer pour réactiver)' : 'Mettre en pause les relances'}
                             >
                               {order.reminders_opt_out ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}

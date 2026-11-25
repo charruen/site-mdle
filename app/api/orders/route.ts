@@ -10,6 +10,7 @@ import {
 } from '@/lib/config'
 import { sendOrderConfirmationEmail } from '@/lib/email'
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
+import { isTestModeEnabled } from '@/lib/settings'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 
 export const dynamic = 'force-dynamic'
@@ -53,8 +54,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Validation impossible.' }, { status: 400 })
     }
 
-    // 3. Vérification de la fenêtre de vente officielle
-    if (!isSalesOpen()) {
+    // 3. Vérification du mode testeur ou de la fenêtre de vente officielle
+    const isTestMode = await isTestModeEnabled()
+
+    if (!isSalesOpen() && !isTestMode) {
       return NextResponse.json(
         { error: 'La période de commande des roses pour la Saint-Valentin 2027 est actuellement fermée.' },
         { status: 403 }
@@ -64,7 +67,7 @@ export async function POST(request: Request) {
     const payment_method = body.payment_method === 'sumup_online' ? 'sumup_online' : 'mdle_counter'
 
     // 4. Vérification de la fermeture du comptoir MDLE pour les espèces
-    if (payment_method === 'mdle_counter' && !isCounterOpen()) {
+    if (payment_method === 'mdle_counter' && !isCounterOpen() && !isTestMode) {
       return NextResponse.json(
         {
           error: `Le règlement au Foyer MDLE est clôturé depuis le ${COUNTER_CLOSING_LABEL}. Veuillez choisir le règlement sécurisé par Carte Bancaire en ligne.`,
@@ -219,15 +222,19 @@ export async function POST(request: Request) {
           }
         }
       } else {
-        if (process.env.NODE_ENV === 'production') {
+        if (process.env.NODE_ENV === 'production' && !isTestMode) {
           console.error('SUMUP_API_KEY ou SUMUP_MERCHANT_CODE manquant en production.')
           return NextResponse.json(
             { error: 'Configuration du paiement par carte incomplète sur le serveur.' },
             { status: 500 }
           )
         }
-        console.warn('Mode dev : clés SumUp non renseignées. Checkout simulé localement.')
-        sumupCheckoutId = `dev_chk_${order.id}`
+        console.warn('Mode dev ou testeur : clés SumUp non renseignées. Checkout simulé.')
+        sumupCheckoutId = `test_chk_${order.id}`
+        await supabase
+          .from('roses_orders')
+          .update({ sumup_checkout_id: sumupCheckoutId })
+          .eq('id', order.id)
       }
     }
 

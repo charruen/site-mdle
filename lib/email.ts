@@ -1,5 +1,6 @@
 import { Resend } from 'resend'
 import {
+  CONTACT_EMAIL,
   COUNTER_CLOSING_LABEL,
   COUNTER_HOURS,
   COUNTER_LOCATION,
@@ -16,7 +17,7 @@ function getResendClient(): Resend | null {
 }
 
 function getSenderEmail(): string {
-  return process.env.EMAIL_FROM || 'MDLE Lycée Jean Perrin <roses@mdle-jeanperrin.fr>'
+  return process.env.EMAIL_FROM || `MDLE Lycée Jean Perrin <${CONTACT_EMAIL}>`
 }
 
 function resolveRecipientEmail(originalEmail: string): string {
@@ -148,7 +149,7 @@ export async function sendOrderConfirmationEmail(order: OrderEmailData): Promise
         </p>
 
         <p style="font-size: 14px; color: #565e74; margin-bottom: 0;">
-          Une question ? Réponds directement à cet e-mail ou écris-nous à <a href="mailto:contact@mdle-jeanperrin.fr" style="color: #b7102a;">contact@mdle-jeanperrin.fr</a>.
+          Une question ? Réponds directement à cet e-mail ou écris-nous à <a href="mailto:${CONTACT_EMAIL}" style="color: #b7102a;">${CONTACT_EMAIL}</a>.
         </p>
       </td>
     </tr>
@@ -314,7 +315,7 @@ export async function sendOrderExpiredEmail(order: OrderEmailData): Promise<bool
           La période de règlement pour la Saint-Valentin ${EDITION_YEAR} est maintenant terminée. N'ayant pas reçu votre règlement de ${order.total_amount.toFixed(2)} € pour la commande <strong>#${shortId}</strong>, celle-ci a été automatiquement annulée et les roses ne seront pas distribuées.
         </p>
         <p style="font-size: 14px; color: #565e74;">
-          Si vous pensez qu'il s'agit d'une erreur, contactez le bureau MDLE au plus vite à <a href="mailto:contact@mdle-jeanperrin.fr" style="color: #b7102a;">contact@mdle-jeanperrin.fr</a>.
+          Si vous pensez qu'il s'agit d'une erreur, contactez le bureau MDLE au plus vite à <a href="mailto:${CONTACT_EMAIL}" style="color: #b7102a;">${CONTACT_EMAIL}</a>.
         </p>
       </td>
     </tr>
